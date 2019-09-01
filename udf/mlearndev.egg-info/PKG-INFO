@@ -1,0 +1,35 @@
+Metadata-Version: 1.1
+Name: mlearndev
+Version: 1.0.10
+Summary: this is a test package for packing python liberaries tutorial.
+Home-page: http://www.muzhen.tk
+Author: muzhenxv
+Author-email: muzhenxv@gmail.com
+License: MIT
+Description-Content-Type: UNKNOWN
+Description: ```
+        import os
+        
+        import sys
+        
+        sys.path.append('/Users/muzhen/repo/mlearn')
+        
+        import mlearndev as mlearn
+        
+        import pandas as pd
+        
+        import json
+        
+        import pickle
+        
+        test_path = '/Users/muzhen/dev/flow_0/datasource/fixed_platform_v4_2.csv'
+        
+        mlearn.chaintest(test_path)
+        ```
+        
+Keywords: test python package
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent

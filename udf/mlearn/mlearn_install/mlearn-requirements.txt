@@ -1,0 +1,8 @@
+cmake
+PyQt5
+dill
+bayesian-optimization
+category_encoders
+seaborn
+graphviz
+xgboost==0.6a2

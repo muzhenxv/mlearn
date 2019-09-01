@@ -1,0 +1,35 @@
+FROM ubuntu:16.04
+#FROM tensorflow/tensorflow:1.9.0-devel-py3
+ENV LANG C.UTF-8
+
+RUN mkdir analyze-server
+RUN mkdir /home/test
+WORKDIR /analyze-server
+ADD . /analyze-server
+ADD mlearn_test/test/ /home/test/
+RUN ls
+
+RUN apt-get update
+RUN apt-get install -y gcc-4.7 vim python-dev nginx build-essential \
+        curl \
+        libfreetype6-dev \
+        libhdf5-serial-dev \
+        libpng12-dev \
+        libzmq3-dev \
+        pkg-config \
+        libgl1-mesa-glx
+RUN rm /usr/bin/gcc
+RUN ln -s /usr/bin/gcc-4.7 /usr/bin/gcc
+#RUN pip3 install --no-index --find-links=/ae-server/packages -r /ae-server/ae-server-requirements.txt
+RUN ["/bin/bash", "-c", "mlearn_test/test/install_ubuntu.sh"]
+# RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple gensim
+RUN /home/anaconda3/bin/pip install -i https://mirrors.aliyun.com/pypi/simple -r /analyze-server/analyze-server-requirements.txt
+#RUN export LD_LIBLABRARY_PATH = /usr/local/cuda-8.0/lib64:$LD_LIBLABRARY_PATH
+ADD uwsgi/analyze-server.conf /etc/nginx/sites-available/default
+
+RUN mkdir -p /data/log/nginx
+EXPOSE 80
+#ENTRYPOINT ["python3"]
+# CMD ["python3", "manage.py", "runserver", "-h", "0.0.0.0", "-p", "5000"]
+# CMD ["python3", "manage.py", "runserver"]
+CMD ["/bin/bash", "run.sh"]

@@ -1,0 +1,846 @@
+Metadata-Version: 1.1
+Name: mlearn
+Version: 1.1.6
+Summary: this is a test package for packing python liberaries tutorial.
+Home-page: http://www.muzhen.tk
+Author: muzhenxv
+Author-email: muzhenxv@gmail.com
+License: MIT
+Description: [TOC]
+        
+        # 整体结构说明
+        
+        ## 功能模块说明
+        
+        sampler:负责数据采样相关
+        
+        spliter:负责数据拆分相关
+        
+        transformer:负责特征工程相关
+        
+        filter:负责特征选择
+        
+        optimizer:负责超参优化
+        
+        trainer:负责模型训练
+        
+        ## 代码架构说明
+        
+        接口层：负责对外交互，入参为json，转换为对应的算法服务需求，调用对应的算法服务
+        
+        服务层：按照功能分为两部分
+        
+         * 算法服务的主接口，负责功能分发，调用相关encoder进行运算
+         * 算法服务独立组件（encoder）
+        
+        调用接口层->调用对应服务主接口->调用算法组件计算
+        
+        ## encoder说明
+        
+        ### 基本说明
+        
+        encoder为基本组件单元，目前分为四种组件单元:
+        
+        1. transformer_encoder: 负责特征工程
+        2. filter_encoder: 负责特征选择
+        3. opt_encoder: 超参优化组件
+        4. trainer_encoder: 估计器（分类器/规则器等）
+        
+        ### encoder的标准格式
+        
+        encoder配置一律服从如下格式：
+        
+        ```json
+        {'method': 'BaseEncoder',
+         'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}}
+        ```
+        
+        包含两个key：
+        
+        - method：encoder名称
+        - params：encoder参数配置的dict
+        
+        ## 接口层入参协议规范说明
+        
+        一般形如
+        
+        ```json
+        {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'test': '/Users/muzhen/dev/flow_0/spliter/test/spliter_result.pkl',
+          'train': '/Users/muzhen/dev/flow_0/spliter/train/spliter_result.pkl'},
+         'out': {'dst': '/Users/muzhen/dev/flow_0/transformer'},
+         'st': {'cate': [{'cols': [],
+            'encoders': [{'method': 'BaseEncoder',
+              'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}},
+             {'method': 'BinningWOEEncoder', 'params': {}}]}],
+          'cont': [{'cols': [],
+            'encoders': [{'method': 'BaseEncoder',
+              'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}},
+             {'method': 'BinningWOEEncoder', 'params': {}}]}],
+          'method': 'auto',
+          'params': {'thr': 5},
+          'verbose': True}}
+        ```
+        
+        包含三个key：
+        
+        * ds： 用于传入数据源信息，比如数据集文件位置
+        * out：用于传入结果信息，比如结果存储文件夹位置
+        * st：用于传入功能需求，比如需要使用什么样的算法进行运算
+        
+        ### st参数规范说明
+        
+        st用于传入功能需求，比如需要使用什么样的算法进行运算。如果调用的功能比较复杂，那么st的配置信息可以理解为按照一定的结构去进行一个或多个encoder的调用和运算。
+        
+        ## 全链路使用说明
+        
+        根据需求组合需要使用的功能模块，形成一条完成的算法链，形如spliter->transformer->filter->trainer，将每个功能模块的入参协议组合成一个大的json。则可以完成整个数据建模和分析任务。
+        
+        ### 使用方法
+        
+        * 使用默认参数
+        
+          ```json
+          test_path = '/Users/muzhen/repo/mlearn/mlearn/data/xk_v4_data.pkl'
+          mlearn.chaintest(test_path, label='14d', app_f=False, optimizer_f=False, custom_params=None, sampler_f=False)
+          ```
+        
+          
+        
+        * 自定义参数
+        
+          ```python
+          import mlearn
+          
+          test_path = '/Users/muzhen/repo/mlearn/mlearn/data/xk_v4_data.pkl'
+          label = '14d'
+          label_col = 'overdue_days'
+          dst = '/Users/muzhen/repo/mlearn/mlearn/flow'
+          
+          
+          params = {'filter': {'ds': {'label': {'name': label, 'type': 'number'},
+                                      'test': os.path.join(dst, 'transformer/test/transformer_result.pkl'),
+                                      'train': os.path.join(dst, 'transformer/train/transformer_result.pkl')},
+                               'out': {'dst': os.path.join(dst, 'filter')},
+                               'st': [{'method': 'StableFilter',
+                                       'params': {'indice_name': 'psi', 'indice_thr': 0.2}},
+                                      {'method': 'SelectFromModelFilter',
+                                       'params': {
+                                           'n_features_to_select': 60,
+                                           'estimator': {
+                                               'method': 'LogisticRegression',
+                                               "params": {}}}}]},
+                    'optimizer': {'ds': {'label': {'name': label, 'type': 'number'},
+                                         'test': os.path.join(dst, 'filter/test/filter_result.pkl'),
+                                         'train': os.path.join(dst, 'filter/train/filter_result.pkl')},
+                                  'out': {'dst': os.path.join(dst, 'optimizer')},
+                                  'st': {'n_folds': 0,
+                                         'opt_encoder': {
+                                             'method': 'BayesianOptimizer',
+                                             'params': {'acq': 'ucb',
+                                                        'alpha': 0.0001,
+                                                        'init_points': 1,
+                                                        'kappa': 2.576,
+                                                        'n_iter': 1}},
+                                         'estimator': {
+                                             'method': 'XGBClassifier',
+                                             'params': {'gamma': [0, 1],
+                                                        'learning_rate': [0.001, 0.8],
+                                                        'max_depth': [2, 8],
+                                                        'n_estimators': [100, 2000],
+                                                        'reg_lambda': [0, 40]}},
+                                         'score_func': 'roc_auc',
+                                         'test_size': 0.2}},
+                    'sampler': {'ds': {'label': {'name': label, 'type': 'number'},
+                                       'table': test_path,
+                                       'test': None,
+                                       'train': None},
+                                'out': {'dst': os.path.join(dst, 'sampler')},
+                                'st': {'base_df': None,
+                                       'base_df_key': 'level',
+                                       'get_group_data': None,
+                                       'group_key': 'level',
+                                       'group_key_level': True,
+                                       'group_num': 10,
+                                       'group_ratio': {'ratio': {0: 0.1, 1: 0.2, 2: 0.5, 3: 0.2}},
+                                       'sort_values': 'apply_risk_created_at',
+                                       'thr': 0.5}},
+                    'spliter': {'ds': {'label': {'name': label, 'type': 'number'},
+                                       'table': test_path,
+                                       'test': None,
+                                       'train': None},
+                                'out': {'dst': os.path.join(dst, 'spliter')},
+                                'st': {'group_key': None,
+                                       'index_col': 'apply_risk_id',
+                                       'label_col': label_col,
+                                       'method': 'oot',
+                                       'random_state': 7,
+                                       'test_size': 0.25,
+                                       'time_col': 'apply_risk_created_at'}},
+                    'trainer': {'ds': {'label': {'name': label, 'type': 'number'},
+                                       'test': os.path.join(dst, 'filter/test/filter_result.pkl'),
+                                       'train': os.path.join(dst, 'filter/train/filter_result.pkl')},
+                                'out': {'dst': os.path.join(dst, 'trainer')},
+                                'st': {'n_folds': 5,
+                                       'oversample': False,
+                                       'estimator': {
+                                           'method': 'XGBClassifier',
+                                           'params': {'base_score': 0.5,
+                                                      'booster': 'gbtree',
+                                                      'colsample_bylevel': 0.8,
+                                                      'colsample_bytree': 0.8,
+                                                      'early_stopping_rounds': 300,
+                                                      'eval_metric': 'auc',
+                                                      'gamma': 0.5,
+                                                      'learning_rate': 0.1,
+                                                      'max_delta_step': 0,
+                                                      'max_depth': 3,
+                                                      'min_child_weight': 10,
+                                                      'n_estimators': 1000,
+                                                      'n_jobs': 1,
+                                                      'objective': 'binary:logistic',
+                                                      'random_state': 0,
+                                                      'reg_alpha': 1,
+                                                      'reg_lambda': 20,
+                                                      'scale_pos_weight': 1,
+                                                      'silent': True,
+                                                      'subsample': 0.7,
+                                                      'verbose': False}},
+                                       'random_state': 7,
+                                       'reweight': False,
+                                           'reweight_with_label': False,
+                                           'cut_off_use_weights': True,
+                                           'cut_off_sample_ratio': 1,
+                                           'shift_thr': 0.1,
+                                           'test_size': 0,
+                                           'verbose': True}},
+                    'transformer': {'ds': {'label': {'name': label, 'type': 'number'},
+                                           'test': os.path.join(dst, 'spliter/test/spliter_result.pkl'),
+                                           'train': os.path.join(dst, 'spliter/train/spliter_result.pkl')},
+                                    'out': {'dst': os.path.join(dst, 'transformer')},
+                                    'st': {'cate': [{'cols': [],
+                                                     'encoders': [{'method': 'BaseEncoder',
+                                                                   'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}},
+                                                                  {'method': 'BinningWOEEncoder',
+                                                                   'params': {}},
+                                                                  ]}],
+                                           'cont': [{'cols': [],
+                                                     'encoders': [{'method': 'BaseEncoder',
+                                                                   'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}},
+                                                                  {'method': 'BinningWOEEncoder',
+                                                                   'params': {}},
+                                                                  ]}],
+                                           'method': 'auto',
+                                           'params': {'thr': 5},
+                                           'verbose': True}}}
+          mlearn.chaintest(app_f=False, optimizer_f=True, custom_params=params, sampler_f=False)
+          ```
+        
+          
+        
+        
+        
+        
+        
+        # sampler模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        {
+                "ds": {
+                    "table": test_path
+                },
+                "out": {"dst": dst},
+                "st": {
+                    "group_key": group_key,
+                    "group_key_level": True,
+                    "sort_values": time_col,
+                    "group_ratio": group_ratio,
+                    "group_num": group_num,
+                    "base_df": base_df,
+                    "base_df_key": base_df_key,
+                    "get_group_data": get_group_data,
+                    "thr": thr
+                }
+            }
+        ```
+        
+        ### 入参说明
+        
+        ```
+        test_path：数据集文件路径、支持csv、pkl格式
+        dst: 结果存储文件夹路径
+        group_key: 分层字段，业务场景中为模型分或level
+        group_key_level: bool，if true，直接按照group_key进行分层抽样，不然先按照group_num进行分箱，将分箱后的结果视为不同层级进行分层抽样
+        group_num: 分箱数量，如果group_key_level是false，则此参数无效
+        sort_values: 排序字段, 分层抽样时按照排序从前往后进行样本截取，而非随机抽样
+        group_ratio: 分层比例，人工指定或者根据基准数据集计算, 
+        			 if None,根据基准数据集计算
+                     elif group_key_level is true, group_ratio like {'ratio': {0: 0.1, 1: 0.2, 2: 0.5, 3: 0.2}}
+                     else group_ratio like {'ratio': {0: 0.1, 1: 0.2, 2: 0.5, 3: 0.2}, 'cut_points': {0: 0.1, 1: 0.2, 2: 0.5, 3: 0.2}, 'lower': 0.01}
+        base_df: 基准数据集，基准数据各个层级的比例就是需求比例。if None，根据get_group_data获取基准数据集
+        get_group_data: default None，sql语句，后台运行sql获得基准数据集
+        thr: float or int. default=0.5。if float, 抽样后样本量不能小于样本*thr， if int，抽样后样本量不能小于thr。
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        params['sampler'] = {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'table': '/Users/muzhen/repo/mlearn/mlearn/data/xk_v4_data.pkl',
+          'test': None,
+          'train': None},
+         'out': {'dst': '/Users/muzhen/dev/flow_0/sampler'},
+         'st': {'base_df': None,
+          'base_df_key': 'level',
+          'get_group_data': None,
+          'group_key': 'level',
+          'group_key_level': True,
+          'group_num': 10,
+          'group_ratio': {'ratio': {0: 0.1, 1: 0.2, 2: 0.5, 3: 0.2}},
+          'sort_values': 'apply_risk_created_at',
+          'thr': 0.5}}
+        mlearn.sampler_ui(json.dumps(params['sampler']))
+        ```
+        
+        ### 结果输出
+        
+        ```
+        。。。
+        ```
+        
+        ## 算法层
+        
+        目前无encoder细分层级，功能全部由接口层对应的服务层函数提供
+        
+        # spliter模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        {'ds': {'label': {'name': label, 'type': 'number'},
+          'table': test_path,
+          'test': None,
+          'train': None},
+         'out': {'dst': dst},
+         'st': {'group_key': group_key,
+          'index_col': index_col,
+          'label_col': label_col,
+          'method': method,
+          'random_state': 7,
+          'test_size': test_size,
+          'time_col': time_col}}
+        ```
+        
+        ### 入参说明
+        
+        ```
+        test_path：数据集文件路径、支持csv、pkl格式
+        label_col: 数据集中目标列的列名，业务上为逾期天数或者处理后的二值目标变量，比如14d
+        time_col：数据集中用于进行数据集排序的列，业务上一般是进件时间
+        label: 目标变量名，必须形如‘Xd’（X为整数，一般为7，14，视业务而定），如果label_col是二值变量，直接复制label_col作为label，不然基于label_col>X的结果转为二值变量
+        index_col：索引字段，该字段会被转换成索引。一般是进件id
+        dst: 结果存储文件夹路径
+        test_size：数据集分割时，测试集需要的占比
+        method：数据集分割的方法。可选值为‘oot’，‘random’
+        		‘oot’: 按照time_col排序后按test_size分割成两部分数据集。如果group_key is not None,那么按照group_key，每个层级分别按照time_col排序后按test_size分割成两部分数据集在合并成train和test两部分
+        		‘random’：随机分割成两部分
+        group_key: 分层抽样字段
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        params['spliter'] = {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'table': '/Users/muzhen/repo/mlearn/mlearn/data/xk_v4_data.pkl',
+          'test': None,
+          'train': None},
+         'out': {'dst': '/Users/muzhen/dev/flow_0/spliter'},
+         'st': {'group_key': None,
+          'index_col': 'apply_risk_id',
+          'label_col': 'overdue_days',
+          'method': 'oot',
+          'random_state': 7,
+          'test_size': 0.25,
+          'time_col': 'apply_risk_created_at'}}
+        mlearn.spliter_ui(json.dumps(params['spliter']))
+        ```
+        
+        ### 结果输出
+        
+        ```
+        输出结果分为三个文件夹：train/test/report
+        
+        train: 内部存放数据分割后的训练集数据
+        
+        test：内部存放数据分割后的测试集数据
+        
+        report：存放spliter后的结果报告，包含
+        
+        1. data_stats.report,数据集的描述性统计结果
+        2. target_stats.report，数据集目标变量的统计结果
+        3. woe_stats.report,数据集的woe分析结果
+        ```
+        
+        ## 算法层
+        
+        目前无encoder细分层级，功能全部由接口层对应的服务层函数提供
+        
+        # transformer模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        {'ds': {'label': {'name': label, 'type': 'number'},
+          'test': test_src,
+          'train': train_src},
+         'out': {'dst': dst},
+         'st': {'cate': cate,
+          'cont': cont,
+          'custom': custom.
+          'method': 'auto',
+          'params': {'thr': thr},
+          'verbose': True}}
+        ```
+        
+        ### 入参说明
+        
+        ```
+        train_src：训练数据集文件路径、支持csv、pkl格式
+        test_src：测试数据集文件路径、支持csv、pkl格式
+        label: 数据集中目标列的列名
+        dst: 结果存储文件夹路径
+        cate: list.每个元素为一个dict，包含cols和encoders两个key，
+        	cols：list，离散特征的list
+        	encoders：list，每个元素是个dict，包含两个key，
+        		method：encoder方法名称
+        		params：encoder方法对应的参数
+        	其中encoders中的encoder按顺序施加在cols上，如果cols是空list，则根据method判断字段类型将离散型变量归属到cols中
+        cont: list.每个元素为一个dict，包含cols和encoders两个key，
+        	cols：list，连续特征的list
+        	encoders：list，每个元素是个dict，包含两个key，
+        		method：encoder方法名称
+        		params：encoder方法对应的参数
+        	其中encoders中的encoder按顺序施加在cols上，如果cols是空list，则根据method判断字段类型将连续型变量归属到cols中
+        custom: list. 每个元素为一个dict，包含cols和encoders两个key，
+        	cols：list，特征名的list
+        	encoders：list，每个元素是个dict，包含两个key，
+        		method：encoder方法名称
+        		params：encoder方法对应的参数
+        	其中encoders中的encoder按顺序施加在cols上,整个custom可以不传
+        method:可选‘auto’
+        	‘auto’：根据特征的取值个数按照thr来划分其归属类型：连续or离散
+        thr：如上用法
+        verbose：是否打印log
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        params['transformer'] = {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'test': '/Users/muzhen/dev/flow_0/spliter/test/spliter_result.pkl',
+          'train': '/Users/muzhen/dev/flow_0/spliter/train/spliter_result.pkl'},
+         'out': {'dst': '/Users/muzhen/dev/flow_0/transformer'},
+         'st': {'cate': [{'cols': [],
+            'encoders': [{'method': 'BaseEncoder',
+              'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}},
+             {'method': 'BinningWOEEncoder', 'params': {}}]}],
+          'cont': [{'cols': [],
+            'encoders': [{'method': 'BaseEncoder',
+              'params': {'cate_thr': 0.5, 'missing_thr': 0.8, 'same_thr': 0.9}},
+             {'method': 'BinningWOEEncoder', 'params': {}}]}],
+          'method': 'auto',
+          'params': {'thr': 5},
+          'verbose': True}}
+        mlearn.transformer_ui(json.dumps(params['transformer']))
+        ```
+        
+        ### 结果输出
+        
+        ```
+        输出结果分为三个文件夹：train/test/report
+        
+        train: 内部存放特征工程后的训练集数据
+        
+        test：内部存放特征工程后的测试集数据
+        
+        report：存放transformer后的结果报告，包含
+        
+        1. stable_test.report,数据集的稳定性测试结果
+        2. feature_indices.report，数据集特征的性能指标评估结果
+        3. woe_stats.report,数据集的woe分析结果
+        4. train_feature_plot.png/test_feature_plot.png,数据集各特征的分箱逾期率图表
+        ```
+        
+        ## 算法层
+        
+        transformer支持多种特征变换方法（encoder），按照特征类型可以分为四类：连续型变量encoder，离散型变量encoder，通用型encoder，自定义型encoder。另外有特征衍生encoder暂时放入transformer中
+        
+        ### 连续型变量encoder
+        
+        #### ContImputerEncoder
+        
+        缺失值填充
+        
+        #### ContBinningEncoder
+        
+        连续型变量分箱
+        
+        ### 离散型变量encoder
+        
+        #### CountEncoder
+        
+        将离散型变量转成成对应词频
+        
+        #### CateLabelEncoder
+        
+        将离散型变量按照id编码
+        
+        #### CateOneHotEncoder
+        
+        对离散型变量做onehot变换
+        
+        #### WOEEncoder
+        
+        对离散型变量做woe变换
+        
+        #### CateBinningEncoder
+        
+        对离散型变量按照woe值进行归并
+        
+        ### 通用型Encoder
+        
+        不限制特征类型，均适用
+        
+        #### BaseEncoder
+        
+        用于剔除缺失值严重列，同值严重列，不同值严重cate列（字符串列如果取值太过于分散，则信息量过低）。
+        
+        #### ImputeEncoder
+        
+        缺失值填充
+        
+        #### BinningEncoder
+        
+        特征分箱，如果是离散值则是归并处理
+        
+        #### BinningWOEEncoder
+        
+        特征先分箱在做woe变换
+        
+        ### 自定义型encoder
+        
+        主要用于对于一些特殊的特征进行个性化变换
+        
+        #### AppCateEncoder
+        
+        对app名称特征进行变换
+        
+        ### 特征衍生encoder
+        
+        #### ReduceGen
+        
+        通过聚类或者降维方法进行特征维度规约，生成新特征
+        
+        # filter模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        {'ds': {'label': {'name': label, 'type': 'number'},
+          'test': test_src,
+          'train': train_src},
+         'out': {'dst': dst},
+         'st': st}
+        ```
+        
+        ### 入参说明
+        
+        ```
+        train_src：训练数据集文件路径、支持csv、pkl格式
+        test_src：测试数据集文件路径、支持csv、pkl格式
+        label: 数据集中目标列的列名
+        dst: 结果存储文件夹路径
+        st: list.每个元素为一个dict，包含method和parmas两个key，
+        		method：encoder方法名称
+        		params：encoder方法对应的参数
+        	其中method按顺序施加在数据集上
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        params['filter'] = {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'test': '/Users/muzhen/dev/flow_0/transformer/test/transformer_result.pkl',
+          'train': '/Users/muzhen/dev/flow_0/transformer/train/transformer_result.pkl'},
+         'out': {'dst': '/Users/muzhen/dev/flow_0/filter'},
+         'st': [{'method': 'StableFilter',
+           'params': {'n_features_to_select': 60,
+                       'estimator': {'method': 'LogisticRegression',
+                                     "params": {}}}}]}
+        mlearn.filter_ui(json.dumps(params['filter']))
+        ```
+        
+        ### 结果输出
+        
+        ```
+        输出结果分为三个文件夹：train/test/report
+        
+        train: 内部存放特征工程后的训练集数据
+        
+        test：内部存放特征工程后的测试集数据
+        
+        report：存放filter后的结果报告，包含
+        
+        1. feature_filter.report，数据集特征的性能指标和特征选择评估结果
+        
+        ```
+        
+        ## 算法层
+        
+        ### StableFilter
+        
+        计算特征稳定性指标，根据稳定性进行特征选择
+        
+        ### RFEFilter
+        
+        RFE方法进行特征选择，支持基于lr系数正负的递归特征选择 code review TODO
+        
+        ### SelectFromModelFilter
+        
+        sklearn.SelectFromModel的封装
+        
+        ### SelectKBestFilter
+        
+        sklearn.SelectKBest的封装
+        
+        # optimizer模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        {'ds': {'label': {'name': label, 'type': 'number'},
+          'test': test_src,
+          'train': train_src},
+         'out': {'dst': dst},
+         'st': {'estimator': estimator,
+          'n_folds': n_folds,
+          'opt_encoder': opt_encoder,
+          'score_func': score_func,
+          'test_size': test_size}}
+        ```
+        
+        ### 入参说明
+        
+        ```
+        train_src：训练数据集文件路径、支持csv、pkl格式
+        test_src：测试数据集文件路径、支持csv、pkl格式
+        label: 数据集中目标列的列名
+        dst: 结果存储文件夹路径
+        estimator： dict, 估计器配置，like {"estimator": "XGBClassifier", "params": {"gamma": [0, 1], "learning_rate": [0.001, 0.8], "max_depth": [2, 8], "n_estimators": [100, 2000], "reg_lambda": [0, 40]}}
+        n_folds：交叉验证的折数，如果为0则根据test_size进行随机数据分割
+        test_size：数据分割比例
+        score_func：评估指标
+        opt_encoder：dict, 优化器配置，like {"method": "BayesianOptimizer", "params": {"acq": "ucb", "alpha": 0.0001, "init_points": 1, "kappa": 2.576, "n_iter": 1}}
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        params['optimizer'] = {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'test': '/Users/muzhen/repo/mlearn/mlearn/flow/filter/test/filter_result.pkl',
+          'train': '/Users/muzhen/repo/mlearn/mlearn/flow/filter/train/filter_result.pkl'},
+         'out': {'dst': '/Users/muzhen/repo/mlearn/mlearn/flow/optimizer'},
+         'st': {'estimator': {'method': 'XGBClassifier',
+           'params': {'gamma': [0, 1],
+            'learning_rate': [0.001, 0.8],
+            'max_depth': [2, 8],
+            'n_estimators': [100, 2000],
+            'reg_lambda': [0, 40]}},
+          'n_folds': 0,
+          'opt_encoder': {'method': 'BayesianOptimizer',
+           'params': {'acq': 'ucb',
+            'alpha': 0.0001,
+            'init_points': 1,
+            'kappa': 2.576,
+            'n_iter': 1}},
+          'score_func': 'roc_auc',
+          'test_size': 0.2}}
+        mlearn.optimizer_ui(json.dumps(params['filter']))
+        ```
+        
+        ### 结果输出
+        
+        ```
+        输出结果分为三个文件夹：train/test/report
+        
+        train: 内部存放训练集数据
+        
+        test：内部存放测试集数据
+        
+        report：存放optimizer后的结果报告，包含
+        
+        1. optimizer_result.report,每轮超参配置及对应效果报告
+        ```
+        
+        ## 算法层
+        
+        ### BayesianOptimizer
+        
+        贝叶斯优化器
+        
+        # trainer模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        {'ds': {'label': {'name': label, 'type': 'number'},
+          'test': test_src,
+          'train': train_src},
+         'out': {'dst': dst},
+         'st': {'cut_off_sample_ratio': cut_off_sample_ratio,
+          'cut_off_use_weights': cut_off_use_weights,
+          'estimator': estimator,
+          'n_folds': n_folds,
+          'oversample': False,
+          'random_state': 7,
+          'reweight': reweight,
+          'reweight_with_label': reweight_with_label,
+          'shift_thr': shift_thr,
+          'test_size': test_size,
+          'verbose': True}}
+        ```
+        
+        ### 入参说明
+        
+        ```
+        train_src：训练数据集文件路径、支持csv、pkl格式
+        test_src：测试数据集文件路径、支持csv、pkl格式
+        label: 数据集中目标列的列名
+        dst: 结果存储文件夹路径
+        n_folds：交叉验证的折数，如果为0则根据test_size进行随机数据分割
+        test_size：数据分割比例
+        estimator： dict, 估计器配置，like {"estimator": "XGBClassifier", "params": {"base_score": 0.5, "booster": "gbtree", "colsample_bylevel": 0.8, "colsample_bytree": 0.8, "early_stopping_rounds": 300, "eval_metric": "auc", "gamma": 0.5, "learning_rate": 0.1, "max_delta_step": 0, "max_depth": 3, "min_child_weight": 10, "n_estimators": 1000, "n_jobs": 1, "objective": "binary:logistic", "random_state": 0, "reg_alpha": 1, "reg_lambda": 20, "scale_pos_weight": 1, "silent": true, "subsample": 0.7, "verbose": false}}
+        reweight: bool，default False。if true，根据test分布进行train样本的权重学习，得到train的weights，并产出train和test分布一致性的mcc指标，if False，weights=None，mcc=None，训练时会将weights传入估计器，if weights=None，则为不带权重学习.reweight方法说明见https://blog.csdn.net/guoyuhaoaaa/article/details/80236500
+        reweight_with_label：bool，default False。在进行权重学习时，是否将label作为特征参与学习中
+        shift_thr：train和test分布一致性判断的mcc指标阈值。当mcc以及weights不等于None时，如果mcc<=shift_thr,则让weights=None
+        cut_off_sample_ratio：按照weights对train样本进行筛选，只取weight从大到小前cut_off_sample_ratio比例的train作为训练样本
+        cut_off_use_weights: bool,default True.按照weights截断得到的train样本在训练时是否附带权重信息。
+        
+        refers: 
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        params['trainer'] = {'ds': {'label': {'name': '14d', 'type': 'number'},
+          'test': '/Users/muzhen/dev/flow_0/filter/test/filter_result.pkl',
+          'train': '/Users/muzhen/dev/flow_0/filter/train/filter_result.pkl'},
+         'out': {'dst': '/Users/muzhen/dev/flow_0/trainer'},
+         'st': {'cut_off_sample_ratio': 1,
+          'cut_off_use_weights': True,
+          'n_folds': 5,
+          'oversample': False,
+          'estimator': {
+                    'method': 'XGBClassifier',
+                    'params': {'base_score': 0.5,
+                               'booster': 'gbtree',
+                               'colsample_bylevel': 0.8,
+                               'colsample_bytree': 0.8,
+                               'early_stopping_rounds': 300,
+                               'eval_metric': 'auc',
+                               'gamma': 0.5,
+                               'learning_rate': 0.1,
+                               'max_delta_step': 0,
+                               'max_depth': 3,
+                               'min_child_weight': 10,
+                               'n_estimators': 1000,
+                               'n_jobs': 1,
+                               'objective': 'binary:logistic',
+                               'random_state': 0,
+                               'reg_alpha': 1,
+                               'reg_lambda': 20,
+                               'scale_pos_weight': 1,
+                               'silent': True,
+                               'subsample': 0.7,
+                               'verbose': False}}
+          'random_state': 7,
+          'reweight': False,
+          'reweight_with_label': False,
+          'shift_thr': 0.1,
+          'test_size': 0,
+          'verbose': True}}
+        mlearn.trainer_ui(json.dumps(params['trainer']))
+        ```
+        
+        ### 结果输出
+        
+        ```
+        输出结果分为三个文件夹：train/test/report
+        
+        train: 内部存放特征工程后的训练集数据
+        
+        test：内部存放特征工程后的测试集数据
+        
+        report：存放trainer后的结果报告，包含
+        
+        1. abstact_data.report,模型效果摘要报告
+        2. feature_importances.report，模型特征重要性结果
+        3. level_report.report,最终预测结果分级评估报告
+        4. trainer_eva_plot.png,模型效果报告图表
+        ```
+        
+        ## 算法层
+        
+        目前通过接口层对应的服务层主函数提供服务，对接sklearn中的estimator。可以将sklearn中estimator视为encoder层级。
+        
+        # Inference模块说明
+        
+        ## 接口层
+        
+        ### 入参格式
+        
+        ```json
+        
+        ```
+        
+        ### 入参说明
+        
+        ```
+        
+        ```
+        
+        ### 使用方法
+        
+        ```python
+        
+        ```
+        
+        ### 结果输出
+        
+        ```
+        
+        ```
+        
+        ## 算法层
+        
+        
+Keywords: test python package
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent
