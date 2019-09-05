@@ -85,7 +85,7 @@ class ContBinningEncoder(BaseEstimator, TransformerMixin):
     diff_thr : int, default: 20
         不同取值数高于该值才进行离散化处理，不然原样返回
 
-    binning_method : str, default: 'dt', {'dt', 'qcut', 'cut'}
+    binning_method : str, default: 'dt', {'dt', 'qcut', 'cut', 'monot'}
         分箱方法, 'dt' which uses decision tree, 'cut' which cuts data by the equal intervals,
         'qcut' which cuts data by the equal quantity. default is 'dt'. if y is None, default auto changes to 'qcut'.
 
@@ -103,14 +103,15 @@ class ContBinningEncoder(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, diff_thr=20, bins=10, binning_method='dt', inplace=True, suffix='_bin', **kwargs):
+        if suffix == '' and inplace == False:
+            raise ValueError('suffix is black conflicts with inplace is False!')
+            
         self.diff_thr = diff_thr
         self.bins = bins
         self.binning_method = binning_method
         self.inplace = inplace
         self.kwargs = kwargs
         self.suffix = suffix
-        self.map = {}
-        self.kmap = {}
 
     def fit(self, X, y=None):
         if y is None:
@@ -120,11 +121,8 @@ class ContBinningEncoder(BaseEstimator, TransformerMixin):
                 raise ValueError('y must be not None if binning_method is dt!')
 
         df = pd.DataFrame(X.copy())
-        if (y is None) & (self.binning_method == 'dt'):
-            self.binning_method = 'qcut'
 
-        target = pd.DataFrame(y)
-        target.columns = ['label']
+        target = pd.Series(y, index=df.index)
 
         self.columns = list(df.columns)
 
@@ -135,31 +133,22 @@ class ContBinningEncoder(BaseEstimator, TransformerMixin):
         self.map = defaultdict(dict)
         self.kmap = defaultdict(dict)
         for c in self.bin_cols:
-            tmp = pd.concat([df[c], target], axis=1)
-            tmp = tmp.dropna()
-
-            self.map[c]['cut_points'] = get_cut_points(tmp[c], tmp['label'], self.bins, self.binning_method,
+            print(c)
+            self.map[c]['cut_points'] = get_cut_points(df[c][df[c].notnull()], target[df[c].notnull()], self.bins, self.binning_method,
                                                        **self.kwargs)
-            # labels需要转成float，因为最终可能出现一些case对应label是np.nan, 如果是int，可能在map时由于类型问题配对不上
-            self.map[c]['labels'] = np.arange(len(self.map[c]['cut_points']) - 1) * 1.0
-            # TODO: why 上一句转成float， 这里for loop 用int？
+            self.map[c]['labels'] = np.arange(len(self.map[c]['cut_points']) - 1)
             for i in range(len(self.map[c]['cut_points']) - 1):
                 self.kmap[c]['(%s, %s]' % (self.map[c]['cut_points'][i], self.map[c]['cut_points'][i + 1])] = i
         return self
 
     def transform(self, X):
         df = pd.DataFrame(X.copy())
-        if list(df.columns) != self.columns:
-            c = [c for c in self.columns if c not in df.columns]
-            raise ValueError(f'Unexpected columns {c} are found!')
+        assert list(df.columns) == self.columns
 
         for c in self.bin_cols:
-            # 可能有nan，所以转换为float
-            df[c + self.suffix] = pd.cut(df[c], bins=self.map[c]['cut_points'], labels=self.map[c]['labels']).astype(
-                float)
+            df[str(c) + self.suffix] = pd.cut(df[c], bins=self.map[c]['cut_points'], labels=self.map[c]['labels'])
             if self.inplace & (self.suffix != ''):
                 del df[c]
-
         return df
 
 

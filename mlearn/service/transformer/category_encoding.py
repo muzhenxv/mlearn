@@ -8,13 +8,12 @@ from sklearn.preprocessing import OneHotEncoder
 from collections import defaultdict
 from .continous_encoding import *
 from sklearn.pipeline import Pipeline
+from ..base_utils.base_utils import infer_dtypes
 
 class CountEncoder(BaseEstimator, TransformerMixin):
     """
-    count encoding: Replace categorical variables with count in the train set.
-    replace unseen variables with 1.
-    Can use log-transform to be avoid to sensitive to outliers.
-    Only provide log-transform with base e, because I think it's enough.
+    count encoding: Replace categorical variables with frequency in the train set.
+    replace unseen variables with 0.
 
 
     Attributes
@@ -23,7 +22,7 @@ class CountEncoder(BaseEstimator, TransformerMixin):
 
     Example
     -------
-    enc = countencoder()
+    enc = CountEncoder()
     enc.fit(['a','b','c', 'b', 'c', 'c'])
     enc.transform(['a','c','b'])
     Out:
@@ -31,20 +30,26 @@ class CountEncoder(BaseEstimator, TransformerMixin):
 
     """
 
-    def __init__(self, unseen_value=0, log_transform=True, smoothing=1, inplace=True, prefix='_count'):
+    def __init__(self, inplace=True, suffix='_count', category_features='infer', cate_threshold=20):
         """
-
-        :param unseen_value: 在训练集中没有出现的值给予unseen_value的出现频次，然后参与smoothing
-        :param log_transform: 是否取log
-        :param smoothing: 光滑处理，在出现频次上+smoothing
+        类别变量按照出现频率编码
         :param inplace: 是否删除原始字段
+        :suffix: 新字段后缀
+        :category_features: "all", "infer" or array
+            Specify what features are treated as categorical.
+
+            - 'infer'(default): 根据字段类型判断，object，category作为处理对象
+            - 'all': All features are treated as categorical.
+            - array: Array of categorical feature names.
+
+            Non-categorical features are always stacked to the right of the matrix.
         """
-        self.unseen_value = unseen_value
-        self.log_transform = log_transform
-        self.smoothing = smoothing
+        if suffix == '' and inplace == False:
+            raise ValueError('suffix is black conflicts with inplace is False!')
         self.inplace = inplace
-        self.map = {}
-        self.prefix = prefix
+        self.suffix = suffix
+        self.category_features = category_features
+        self.cate_threshold = 20
 
     def fit(self, X, y=None):
         """
@@ -52,18 +57,18 @@ class CountEncoder(BaseEstimator, TransformerMixin):
         :param y: None
         :return:
         """
-        # TODO: 必须copy。不然使用df[c].replace这样的操作，会直接作用在X上。虽然不加copy，df和X， df[c]和X[c]的内存地址已经不一样。待查明！？
-        # 如果不强转为str，那么如果有一列为float型，那么通过Counter或者pd.unique方法得到的结果result虽然也会有nan的存在，但是进行np.nan in result判断时会报False.
-        df = pd.DataFrame(X.copy()).astype(str)
-
-        self._set_unseen_key(df)
-
-        for c in df.columns:
-            dmap = Counter(df[c])
-            for k in dmap.keys():
-                dmap[k] += self.smoothing
-            dmap[self.unseen_key] = self.unseen_value + self.smoothing
-            self.map[c] = dmap
+        self.map = {}
+        df = pd.DataFrame(X.copy())
+        
+        if self.category_features == 'infer':
+            self.category_columns = infer_dtypes(df, self.cate_threshold, dtype='cate')
+        elif self.category_features == 'all':
+            self.category_columns = list(df.columns)
+        else:
+            self.category_columns = self.category_features
+            
+        for c in self.category_columns:
+            self.map[c] = df[c].value_counts(normalize=True, dropna=False).to_dict()
 
         self.columns = list(df.columns)
         return self
@@ -73,30 +78,83 @@ class CountEncoder(BaseEstimator, TransformerMixin):
         :param X: df
         :return:
         """
-        # df[c].replace方法要求入参的字典key的类型必须和df[c]本身的数值类型一致，改用map方法无此问题
-        df = pd.DataFrame(X.copy()).astype(str)
-        if list(df.columns) != self.columns:
-            c = [c for c in self.columns if c not in df.columns]
-            raise ValueError(f'Unexpected columns {c} are found!')
+        df = pd.DataFrame(X.copy())
+        assert list(df.columns) == self.columns
 
-        for c in self.columns:
-            l = [i for i in df[c].unique() if i not in self.map[c].keys()]
-            if len(l) > 0:
-                df[c].replace(l, self.unseen_key, inplace=True)
-            df[str(c) + self.prefix] = df[c].map(self.map[c])
-            if self.inplace:
+        for c in self.category_columns:
+            df[str(c) + self.suffix] = df[c].map(self.map[c]).astype(float).fillna(0)
+            if self.inplace & (self.suffix != ''):
                 del df[c]
-        if self.log_transform:
-            X = np.log(df)
-        return X
+        return df
 
-    def _set_unseen_key(self, df):
-        if type(df) != pd.DataFrame:
-            df = pd.DataFrame(df)
-        t = 'unknown'
-        while t in df.values:
-            t += '*'
-        self.unseen_key = t
+
+class WOEEncoder(BaseEstimator, TransformerMixin):
+    """
+    woe变换
+
+    适用于cont和cate，但对多取值cont无效，支持缺失值
+
+    Parameters
+    ----------
+    diff_thr : int, default: 20
+        不同取值数小于等于该值的才进行woe变换，不然原样返回
+
+    woe_min : int, default: -np.log(100)
+        woe的截断最小值
+
+    woe_max : int, default: np.log(100)
+        woe的截断最大值
+
+    nan_thr : float, default: 0.01
+        对缺失值采用平滑方法计算woe值，nan_thr为平滑参数
+
+    """
+
+    def __init__(self, cate_threshold=20, category_features='infer', woe_min=-4.6, woe_max=4.6, inplace=True, suffix='_woe'):
+        if suffix == '' and inplace == False:
+            raise ValueError('suffix is black conflicts with inplace is False!')
+            
+        self.cate_threshold = cate_threshold
+        self.woe_min = woe_min
+        self.woe_max = woe_max
+        self.inplace = inplace
+        self.suffix = suffix
+        self.category_features = category_features
+        
+    def fit(self, X, y):
+        self.map = {}
+        self.ivmap = {}   
+        
+        df = pd.DataFrame(X.copy())
+        self.columns = list(df.columns)
+
+        if self.category_features == 'infer':
+            self.category_columns = infer_dtypes(df, self.cate_threshold, dtype='cate')
+        elif self.category_features == 'all':
+            self.category_columns = list(df.columns)
+        else:
+            self.category_columns = self.category_features        
+
+        target = pd.Series(y, index=df.index)
+        for c in self.category_columns:
+            pos = df[c][target==1].value_counts(normalize=True, dropna=False)
+            neg = df[c][target==0].value_counts(normalize=True, dropna=False)
+            tmp = np.log(pos.divide(neg,fill_value=0)).replace([np.inf, -np.inf], [self.woe_max, self.woe_min])
+            self.map[c] = tmp.to_dict()
+            self.ivmap[c] = np.sum(pos.sub(neg, fill_value=0) * tmp)
+            if np.nan not in self.map[c]:
+                self.map[c][np.nan] = 0            
+        return self
+
+    def transform(self, X):
+        df = pd.DataFrame(X.copy())
+        assert list(df.columns) == self.columns
+
+        for c in self.category_columns:
+            df[c + self.suffix] = df[c].map(self.map[c]).astype(float).fillna(self.map[c][np.nan])
+            if self.inplace & (self.suffix != ''):
+                del df[c]
+        return df
 
 
 class CateLabelEncoder(BaseEstimator, TransformerMixin):
@@ -170,40 +228,6 @@ class CateLabelEncoder(BaseEstimator, TransformerMixin):
             t += '*'
         self.unseen_key = t
 
-
-# class CateOneHotEncoder(BaseEstimator, TransformerMixin):
-#     def __init__(self, n_values="auto", categorical_features="all",
-#                  dtype=np.float64, sparse=True, handle_unknown='ignore', sparse_thr=200):
-#         self.n_values = n_values
-#         self.categorical_features = categorical_features
-#         self.dtype = dtype
-#         self.sparse = sparse
-#         self.handle_unknown = handle_unknown
-#         self.sparse_thr = sparse_thr
-#         self.onehot_params = self.get_params()
-#         del self.onehot_params['sparse_thr']
-
-#     def fit(self, X, y=None):
-#         df = pd.DataFrame(X.copy())
-#         self.le = CateLabelEncoder()
-#         self.le.fit(df)
-
-#         df = self.le.transform(df)
-
-#         self.onehot = OneHotEncoder(**self.onehot_params)
-#         self.onehot.fit(df)
-#         return self
-
-#     def transform(self, X):
-#         df = pd.DataFrame(X.copy())
-#         df = self.le.transform(df)
-#         df = self.onehot.transform(df)
-#         if df.shape[1] < self.sparse_thr:
-#             df = pd.DataFrame(df.todense())
-#             df.columns = [str(i) + '_onehot' for i in df.columns]
-#         return df
-
-
 class CateOneHotEncoder(BaseEstimator, TransformerMixin):
     def __init__(self, n_values="auto", categorical_features="all",
                  dtype=np.float64, sparse=True, handle_unknown='ignore', sparse_thr=200):
@@ -231,159 +255,6 @@ class CateOneHotEncoder(BaseEstimator, TransformerMixin):
         return df
 
 
-def _woe_iv(x, y, woe_min=-20, woe_max=20, nan_woe=None, limit=True):
-    # TODO: woe_min&woe_max设置是否合理？
-    """
-
-    :param x: array
-    :param y: array
-    :return:
-    """
-    x = pd.Series(x)
-    unique_k = list(np.unique(x.dropna()))
-    missing = 'missing'
-    while missing in x:
-        missing += 'missing'
-
-    x = np.array(x.fillna(missing))
-    y = np.array(y)
-
-    if missing in x:
-        unique_k.append(missing)
-
-    pos = (y == 1).sum()
-    neg = (y == 0).sum()
-
-    dmap = {}
-
-    iv = 0
-    for k in unique_k:
-        if (k == missing) & (nan_woe is not None):
-            woe1 = nan_woe
-        else:
-            indice = np.where(x == k)
-            pos_r = (y[indice] == 1).sum() / pos
-            neg_r = (y[indice] == 0).sum() / neg
-
-            if (pos_r == 0) & (neg_r == 0):
-                woe1 = 0
-            elif (pos_r == 0) | (pos_r is np.nan):
-                woe1 = woe_min
-            elif (neg_r == 0) | (neg_r is np.nan):
-                woe1 = woe_max
-            else:
-                woe1 = math.log(pos_r / neg_r)
-                if limit:
-                    woe1 = min(woe1, woe_max)
-                    woe1 = max(woe1, woe_min)
-
-        dmap[k] = woe1
-        iv += (pos_r - neg_r) * woe1
-    if len(unique_k) == 1:
-        iv = np.nan
-    return dmap, iv
-
-
-class WOEEncoder(BaseEstimator, TransformerMixin):
-    """
-    woe变换
-
-    适用于cont和cate，但对多取值cont无效，支持缺失值
-
-    Parameters
-    ----------
-    diff_thr : int, default: 20
-        不同取值数小于等于该值的才进行woe变换，不然原样返回
-
-    woe_min : int, default: -20
-        woe的截断最小值
-
-    woe_max : int, default: 20
-        woe的截断最大值
-
-    nan_thr : float, default: 0.01
-        对缺失值采用平滑方法计算woe值，nan_thr为平滑参数
-
-    """
-
-    def __init__(self, diff_thr=20, woe_min=-20, woe_max=20, nan_thr=0.01, inplace=True, suffix='_woe', limit=True,
-                 **kwargs):
-        self.diff_thr = diff_thr
-        self.woe_min = woe_min
-        self.woe_max = woe_max
-        self.nan_thr = nan_thr
-        self.inplace = inplace
-        self.suffix = suffix
-        self.limit = limit
-        self.map = {}
-        self.ivmap = {}
-
-    def fit(self, X, y):
-        df = pd.DataFrame(X.copy())
-        self.map = {}
-        self.columns = list(df.columns)
-        t = df.nunique()
-        self.woecols = list(t[t <= self.diff_thr].index)
-        self.nowoecols = [c for c in self.columns if c not in self.woecols]
-
-        y = pd.DataFrame(y)
-        label = 'label'
-        y.columns = [label]
-        for c in self.woecols:
-            tmp = pd.concat([df[c], y], axis=1)
-
-            nan_woe = self.nan_woe_cmpt(tmp, c, label, self.nan_thr, self.woe_min, self.woe_max)
-
-            # 计算woe时总正样例数需要考虑nan情况, 将nan_woe作为缺失值对应的woe值
-            # tmp = tmp.dropna()
-
-            dmap, iv = _woe_iv(tmp[c], tmp[label], self.woe_min, self.woe_max, limit=self.limit)
-            dmap[np.nan] = nan_woe
-
-            self.map[c] = dmap
-            self.ivmap[c] = iv
-        # for c in self.nowoecols:
-        #     self.map[c] = None
-        return self
-
-    def transform(self, X):
-        df = pd.DataFrame(X.copy())
-        if list(df.columns) != self.columns:
-            c = [c for c in self.columns if c not in df.columns]
-            raise ValueError(f'Unexpected columns {c} are found!')
-
-        for c in self.woecols:
-            nan_val = self.map[c][np.nan]
-            df[c + self.suffix] = df[c].map(lambda x: self.map[c].get(x, nan_val))
-            if self.inplace & (self.suffix != ''):
-                del df[c]
-        return df
-
-    @staticmethod
-    def nan_woe_cmpt(df, col, label='label', nan_thr=0.01, woe_min=-20, woe_max=20, limit=True):
-        m = df[label].mean()
-        pos_base = int(df.shape[0] * m * nan_thr)
-        neg_base = int(df.shape[0] * (1 - m) * nan_thr)
-        tmp = df[df[col].isnull()]
-        t = tmp[label].shape[0]
-        pos = tmp[label].sum()
-        neg = t - pos
-        pos_r = (pos + pos_base) / df[label].sum()
-        neg_r = (neg + neg_base) / (df.shape[0] - df[label].sum())
-
-        if (pos_r == 0) & (neg_r == 0):
-            woe1 = 0
-        elif (pos_r == 0) | (pos_r is np.nan):
-            woe1 = woe_min
-        elif (neg_r == 0) | (neg_r is np.nan):
-            woe1 = woe_max
-        else:
-            woe1 = math.log(pos_r / neg_r)
-            if limit:
-                woe1 = min(woe1, woe_max)
-                woe1 = max(woe1, woe_min)
-
-        return woe1
 
 
 class CateBinningEncoder(BaseEstimator, TransformerMixin):

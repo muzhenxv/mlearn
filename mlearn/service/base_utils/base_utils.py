@@ -4,6 +4,25 @@ import numpy as np
 import json
 import os
 
+def infer_dtypes(df, threshold=5, dtype='cate'):
+    """
+    dataframe 判断特征类型。首先根据类型判断，然后对数值型做附加判断
+    :param df:
+    :param threshold: 取值数小于thr，视为离散。
+    :param dtype: 'cate' or 'cont'
+    :return:
+    """
+    df = df.apply(pd.to_numeric, errors='ignore')
+    cols = df.nunique()[df.nunique() < threshold].index.values
+    df[cols] = df[cols].astype(str)
+
+    if dtype == 'cate':
+        cols = list(df.select_dtypes(exclude=np.number).columns)
+    elif dtype == 'cont':
+        cols = list(df.select_dtypes(include=np.number).columns)
+    else:
+        raise ValueError('param dtype must be assigned as cate or cont!')
+    return cols
 
 def convert_df_type(df, threshold=5, retsize=False):
     """
