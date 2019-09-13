@@ -34,9 +34,22 @@ def infer_dtypes(df, threshold=5, dtype='cate'):
         raise ValueError('param dtype must be assigned as cate or cont!')
     return cols
 
-# TODO: 即使取值数很多，在某几列的占比非常高的情况下，即使要求分箱数为10，最终分箱结果可能依旧只有1，2类。
+def qcut_duplicates(X, y, bins=10, precision=8, retbins=True, duplicates='drop', **kwargs):
+    """
+    用于消除此种情况：即使取值数很多，在某几列的占比非常高的情况下，即使要求分箱数为10，最终分箱结果可能依旧只有少数几类。
+    """
+    X_copy = pd.Series(X)
+    t = X_copy.value_counts()
+    points1 = t[t>=len(X)/bins].index.tolist()
+    X_copy = X_copy[~X_copy.isin(points)]
+    _, points2 = pd.qcut(X_copy, q=bins-len(points1), retbins=True, duplicates=duplicates, precision=precision)
+    l = sorted(points1 + list(points2))
+    if retbins:
+        return pd.cut(X, bins=l, include_lowest=True), l
+    else:
+        return pd.cut(X, bins=l, include_lowest=True)
 
-def dt_cut_points(x, y, max_depth=4, min_samples_leaf=0.05, max_leaf_nodes=None, random_state=7):
+def dt_cut_points(x, y, bins=None, max_depth=None, min_samples_leaf=1, max_leaf_nodes=None, random_state=7, **kwargs):
     """
     A decision tree method to bin continuous variable to categorical one.
     :param x: The training input samples
@@ -46,6 +59,8 @@ def dt_cut_points(x, y, max_depth=4, min_samples_leaf=0.05, max_leaf_nodes=None,
     :param max_leaf_nodes: Grow a tree with max_leaf_nodes in best-first fashion. Best nodes are defined as relative reduction in impurity. If None then unlimited number of leaf nodes.
     :return: The list of cut points
     """
+    if bins is not None:
+        max_leaf_nodes = bins
     dt = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf, max_leaf_nodes=max_leaf_nodes,
                                 random_state=random_state)
     dt.fit(np.array(x).reshape(-1, 1), np.array(y))
@@ -76,9 +91,9 @@ def get_cut_points(X, y=None, bins=10, binning_method='dt', precision=8, **kwarg
     if binning_method == 'cut':
         _, cut_points = pd.cut(X, bins=bins, retbins=True, precision=precision)
     elif binning_method == 'qcut':
-        _, cut_points = pd.qcut(X, q=bins, retbins=True, duplicates='drop', precision=precision)
+        _, cut_points = qcut_duplicates(X, q=bins, retbins=True, duplicates='drop', precision=precision)
     elif binning_method == 'dt':
-        cut_points = dt_cut_points(X, y, **kwargs)
+        cut_points = dt_cut_points(X, y, bins=bins, **kwargs)
     elif binning_method == 'monot':
         cut_points = monot_cut_points(X, y, precision)
     else:
