@@ -34,7 +34,7 @@ def infer_dtypes(df, threshold=5, dtype='cate'):
         raise ValueError('param dtype must be assigned as cate or cont!')
     return cols
 
-def qcut_duplicates(X, y, bins=10, precision=8, retbins=True, duplicates='drop', **kwargs):
+def qcut_duplicates(X, bins=10, precision=8, retbins=True, duplicates='drop', **kwargs):
     """
     用于消除此种情况：即使取值数很多，在某几列的占比非常高的情况下，即使要求分箱数为10，最终分箱结果可能依旧只有少数几类。
     """
@@ -91,7 +91,7 @@ def get_cut_points(X, y=None, bins=10, binning_method='dt', precision=8, **kwarg
     if binning_method == 'cut':
         _, cut_points = pd.cut(X, bins=bins, retbins=True, precision=precision)
     elif binning_method == 'qcut':
-        _, cut_points = qcut_duplicates(X, q=bins, retbins=True, duplicates='drop', precision=precision)
+        _, cut_points = qcut_duplicates(X, bins=bins, retbins=True, duplicates='drop', precision=precision)
     elif binning_method == 'dt':
         cut_points = dt_cut_points(X, y, bins=bins, **kwargs)
     elif binning_method == 'monot':
