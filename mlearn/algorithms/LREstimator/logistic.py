@@ -19,9 +19,14 @@ class LogisticRegressionEstimator(LogisticRegression):
 
         if std_scaler is None:
             self.std_scaler = StandardScaler()
+        else:
+            self.std_scaler = std_scaler
 
     def fit(self, X, y, sample_weight=None):
-        X_scal = self.std_scaler.fit_transform(X)
+        try:
+            X_scal = self.std_scaler.fit_transform(X)
+        except:
+            X_scal = self.std_scaler.fit_transform(X, y)
         super().fit(X_scal, y, sample_weight=sample_weight)
         return self
         

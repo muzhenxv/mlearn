@@ -24,7 +24,7 @@ def infer_dtypes(df, threshold=5, dtype='cate'):
     df = df.apply(pd.to_numeric, errors='ignore')
     cols = df.nunique()[df.nunique() < threshold].index.values
 #     df[cols] = df[cols].astype(str)
-    cols = list(set(list(df.select_dtypes(exclude=np.number).columns) + list(cols)))
+    cols = list(set(list(df.select_dtypes(exclude=[np.number]).columns) + list(cols)))
 
     if dtype == 'cate':
         cols = cols
@@ -41,7 +41,7 @@ def qcut_duplicates(X, bins=10, precision=8, retbins=True, duplicates='drop', **
     X_copy = pd.Series(X)
     t = X_copy.value_counts()
     points1 = t[t>=len(X)/bins].index.tolist()
-    X_copy = X_copy[~X_copy.isin(points)]
+    X_copy = X_copy[~X_copy.isin(points1)]
     _, points2 = pd.qcut(X_copy, q=bins-len(points1), retbins=True, duplicates=duplicates, precision=precision)
     l = sorted(points1 + list(points2))
     if retbins:
@@ -388,6 +388,12 @@ class CateBinningEncoder(BaseEstimator, TransformerMixin):
         
     def fit(self, X, y=None):
         self.kmap = {}
+        
+        if y is None:
+            self.typ = 'copy'
+            return self
+        else:
+            self.typ = 'woebin'
 
         if y is None:
             if self.binning_method != 'dt':
@@ -426,8 +432,10 @@ class CateBinningEncoder(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        if self.inplace and self.suffix == '':
-            raise ValueError('inplace is True conflicts with suffix is blank!')
+        if self.typ == 'copy':
+            return X
+        if self.inplace is False and self.suffix == '':
+            raise ValueError('inplace is False conflicts with suffix is blank!')
         df = pd.DataFrame(X.copy())
         assert list(df.columns) == self.columns
 
