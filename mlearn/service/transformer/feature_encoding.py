@@ -443,7 +443,7 @@ class CateBinningEncoder(BaseEstimator, TransformerMixin):
         for c in self.specified_unique_columns:
             # TODO: 缺失和未见词应该统一为0么？还是进行区分？
             df[str(c) + self.suffix] = df[c].map({v: k for k, v in self.kmap[c].items()}).fillna(0).astype('category')
-            if self.inplace:
+            if self.inplace & (self.suffix != ''):
                 del df[c]
         if self.inplace:
             t2 = df[[c for c in df.columns if c not in set(self.specified_woebin_columns)]]
@@ -594,18 +594,16 @@ class CateOneHotEncoder(BaseEstimator, TransformerMixin):
         else:
             t2 = df
         if not self.sparse:
-            df = pd.DataFrame(t1)
+            df = pd.DataFrame(t1, index=df.index)
             df.columns = [str(c) + self.suffix for c in df.columns]
-            df = pd.concat([t2, t1], axis=1)
+            df = pd.concat([t2, df], axis=1)
             return df
         else:
             return t1
 
 class BinningEncoder(BaseEstimator, TransformerMixin):
     """
-    将连续型变量转化为离散型
-
-    仅适用于cont， 支持缺失值
+    将变量转化为离散型
 
     Parameters
     ----------
