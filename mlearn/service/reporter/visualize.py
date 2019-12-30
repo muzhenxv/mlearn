@@ -459,6 +459,7 @@ def feature_curve(x, y, ax, target=None, max_depth=5, min_samples_leaf=0.01, met
             else:
                 x2 = pd.qcut(np.array(x), q=bins, duplicates='drop')
         else:
+            x_points = x.unique()
             x2 = x
     df['x'] = np.array(x2)
     df['x'] = df['x']
@@ -469,10 +470,11 @@ def feature_curve(x, y, ax, target=None, max_depth=5, min_samples_leaf=0.01, met
 
     if (cut_points is None) and (x_points is not None):
         t2 = pd.DataFrame(x_points, columns=['x'])
-        t = t.merge(t2, on='x', how='outer').fillna(0).sort_values('x')
     else:
         t2 = pd.DataFrame(x2.categories, columns=['x'])
-        t = t.merge(t2, on='x', how='outer').fillna(0).sort_values('x')
+    t = t.merge(t2, on='x', how='outer')
+    t.iloc[:, 1:] = t.iloc[:, 1:].fillna(0)
+    t = t.sort_values('x')
 
     ax.bar(range(t.shape[0]), t['volume'], tick_label=t.x, label='volume', yerr=0.00001, width=0.5, alpha=0.5)
     ax.set_ylim([0, max(t['volume']) * 1.2])
@@ -493,7 +495,7 @@ def feature_curve(x, y, ax, target=None, max_depth=5, min_samples_leaf=0.01, met
 
 
 def feature_plot(df_o, y, bins=10, figsize=(7, 4), plt_label='overdue rate', col_num=3, path=None, cut_points=None,
-                 save_fig=True):
+                 ylim=None, save_fig=True):
     """
 
     :param data: dict. i.e. dict. i.e. {'model1': [y_true1, y_pred1], 'model2': [y_true2, y_pred2]]}
@@ -519,7 +521,7 @@ def feature_plot(df_o, y, bins=10, figsize=(7, 4), plt_label='overdue rate', col
         row_n = i // col_num
         col_n = i % col_num
         ax2 = fig2.add_subplot(spec2[row_n, col_n])
-        tmp = feature_curve(df[v], y, ax2, target=v, plt_label=plt_label)
+        tmp = feature_curve(df[v], y, ax2, target=v, plt_label=plt_label, ylim=ylim)
         dic_all[v] = twinx_to_dict(tmp, v)
     plt.tight_layout()
 
