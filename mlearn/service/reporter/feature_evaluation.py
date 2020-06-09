@@ -8,9 +8,10 @@ from sklearn import metrics as mr
 from sklearn.model_selection import StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier
 
-from . import feature_encoding
-from ..transformer.category_encoding import *
-from ..transformer.continous_encoding import *
+# from . import feature_encoding
+from ..transformer.feature_encoding import *
+# from ..transformer.category_encoding import *
+# from ..transformer.continous_encoding import *
 from ..transformer.base_encoding import *
 import copy
 from ..base_utils import *
@@ -256,7 +257,7 @@ class WOEReport(BaseEstimator, TransformerMixin):
         if type(y_data) == str:
             y_data = df.pop(y_data)
         tmp = self.enc.transform(df)
-        woe_enc = WOEEncoder(diff_thr=np.inf, suffix='')
+        woe_enc = WOEEncoder(cate_threshold=np.inf, suffix='')
         tmp2 = woe_enc.fit_transform(tmp, y_data)
 
         t = pd.DataFrame()
