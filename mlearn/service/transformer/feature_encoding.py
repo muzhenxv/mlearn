@@ -34,20 +34,39 @@ def infer_dtypes(df, threshold=5, dtype='cate'):
         raise ValueError('param dtype must be assigned as cate or cont!')
     return cols
 
+# deprecated
+    # def qcut_duplicates(X, bins=10, precision=8, retbins=True, duplicates='drop', **kwargs):
+    #     """
+    #     用于消除此种情况：即使取值数很多，在某几列的占比非常高的情况下，即使要求分箱数为10，最终分箱结果可能依旧只有少数几类。
+    #     """
+    #     X_copy = pd.Series(X)
+    #     t = X_copy.value_counts()
+    #     points1 = t[t>=len(X)/bins].index.tolist()
+    #     X_copy = X_copy[~X_copy.isin(points1)]
+    #     _, points2 = pd.qcut(X_copy, q=bins-len(points1), retbins=True, duplicates=duplicates, precision=precision)
+    #     l = sorted(points1 + list(points2))
+    #     if retbins:
+    #         return pd.cut(X, bins=l, include_lowest=True), l
+    #     else:
+    #         return pd.cut(X, bins=l, include_lowest=True)
+
 def qcut_duplicates(X, bins=10, precision=8, retbins=True, duplicates='drop', **kwargs):
     """
     用于消除此种情况：即使取值数很多，在某几列的占比非常高的情况下，即使要求分箱数为10，最终分箱结果可能依旧只有少数几类。
     """
     X_copy = pd.Series(X)
-    t = X_copy.value_counts()
-    points1 = t[t>=len(X)/bins].index.tolist()
+    t = X_copy.value_counts(normalize=True)
+    points1 = t[t>=0.5/bins].index.tolist()
     X_copy = X_copy[~X_copy.isin(points1)]
     _, points2 = pd.qcut(X_copy, q=bins-len(points1), retbins=True, duplicates=duplicates, precision=precision)
+    print(points2)
     l = sorted(points1 + list(points2))
+    l[0] = -np.inf
+    l[-1] = np.inf
     if retbins:
-        return pd.cut(X, bins=l, include_lowest=True), l
+        return pd.cut(X, bins=l, include_lowest=True, precision=precision), l
     else:
-        return pd.cut(X, bins=l, include_lowest=True)
+        return pd.cut(X, bins=l, include_lowest=True, precision=precision)
 
 def dt_cut_points(x, y, bins=None, max_depth=None, min_samples_leaf=1, max_leaf_nodes=None, random_state=7, **kwargs):
     """

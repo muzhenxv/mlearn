@@ -87,40 +87,6 @@ class BaseEncoder(BaseEstimator, TransformerMixin):
         return df.drop(self.exclude_cols, axis=1)
 
 
-class NothingEncoder(BaseEstimator, TransformerMixin):
-    """
-    原样返回，不做任何处理。本用于测试，现在transformer支持在encoders序列为空情况下原样返回，此类已无实际用途。
-
-    适用于cont和cate，支持缺失值
-    """
-
-    def __init__(self):
-        pass
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        return pd.DataFrame(X)
-
-
-class DropEncoder(BaseEstimator, TransformerMixin):
-    """
-    此类用于返回空df，换言之删除所有字段。
-
-    适用于cont和cate， 支持缺失值
-    """
-
-    def __init__(self):
-        pass
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        return pd.DataFrame()
-
-
 class ImputeEncoder(BaseEstimator, TransformerMixin):
     def __init__(self, fillna_value=-999):
         self.fillna_value = fillna_value
