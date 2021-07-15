@@ -12,7 +12,7 @@ from sklearn.tree import DecisionTreeClassifier
 from ..transformer.feature_encoding import *
 # from ..transformer.category_encoding import *
 # from ..transformer.continous_encoding import *
-from ..transformer.base_encoding import *
+# from ..transformer.base_encoding import *
 import copy
 from ..base_utils import *
 
@@ -241,7 +241,7 @@ class WOEReport(BaseEstimator, TransformerMixin):
         y_data = copy.copy(y)
         if type(y_data) == str:
             y_data = df.pop(y_data)
-        self.enc = BinningEncoder(suffix='', **kwargs)
+        self.enc = BinningEncoder(suffix='', cate_threshold=20, cate_bins=20, cont_bins=20, **kwargs)
         tmp = self.enc.fit_transform(df, y_data)
 
         for c in tmp.columns:
@@ -258,7 +258,7 @@ class WOEReport(BaseEstimator, TransformerMixin):
             y_data = df.pop(y_data)
         tmp = self.enc.transform(df)
         woe_enc = WOEEncoder(cate_threshold=np.inf, suffix='')
-        tmp2 = woe_enc.fit_transform(tmp, y_data)
+        _ = woe_enc.fit_transform(tmp, y_data)
 
         t = pd.DataFrame()
         for c in tmp.columns:
@@ -291,7 +291,8 @@ class WOEReport(BaseEstimator, TransformerMixin):
         # 下面的map会把bin_dict字典中不存在的值全部变成nan，但是对于没有binning过程也就是字典为空的特征，需要手动replace
         t1['bin'].replace([missing, 'All'], np.nan, inplace=True)
         if bin_dict is not None:
-            t1['bin'] = t1['bin'].map(self.invert_dict(bin_dict))
+            # t1['bin'] = t1['bin'].map(self.invert_dict(bin_dict))
+            t1['bin'] = t1['bin'].map(bin_dict)
         t1['woe'] = pd.to_numeric(t1.index, errors='ignore')
         t1['woe'].replace(woe_dict, inplace=True)
 
@@ -311,7 +312,8 @@ class WOEReport(BaseEstimator, TransformerMixin):
 
     @staticmethod
     def invert_dict(d):
-        return dict([(v, k) for k, v in d.items()])
+        # print(d)
+        return dict([(str(v), k) for k, v in d.items()])
 
 
 class ResultReport:

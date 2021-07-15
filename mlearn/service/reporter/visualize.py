@@ -462,11 +462,11 @@ def feature_curve(x, y, ax, target=None, max_depth=5, min_samples_leaf=0.01, met
             x_points = x.unique()
             x2 = x
     df['x'] = np.array(x2)
-    df['x'] = df['x']
     df['y'] = np.array(y)
     t = pd.pivot_table(df, values='y', index='x', aggfunc=[np.mean, len]).reset_index().sort_values('x',
                                                                                                     ascending=True)
     t.columns = ['x', 'overdue_rate', 'volume']
+
 
     if (cut_points is None) and (x_points is not None):
         t2 = pd.DataFrame(x_points, columns=['x'])

@@ -37,7 +37,7 @@ class FeatureFilter(BaseEstimator, TransformerMixin):
         tmp = df
         test_tmp = test_src
         for encoder_dict in self.st:
-            enc = instantiate.instantiate(encoder_dict.method, encoder_dict.params)
+            enc = instantiate.instantiate(encoder_dict['method'], encoder_dict['params'])
             tmp = enc.fit_transform(tmp, label, test_tmp, test_label)
             test_tmp = enc.transform(test_tmp)
             encoder_dict['enc'] = enc
@@ -46,34 +46,34 @@ class FeatureFilter(BaseEstimator, TransformerMixin):
                 break
         return self
 
-    def fit_transform(self, df_src, label=None, test_src=None, test_label=None):
-        self.label = label
-        df = get_data(df_src)
-        label = df.pop(label)
-        if test_src is not None:
-            test_src = get_data(test_src)
-            if type(test_label) == str:
-                if test_label in test_src.columns:
-                    test_label = test_src.pop(test_label)
-                else:
-                    raise ValueError('%s not in test data!' % test_label)
+    # def fit_transform(self, df_src, label=None, test_src=None, test_label=None):
+    #     self.label = label
+    #     df = get_data(df_src)
+    #     label = df.pop(label)
+    #     if test_src is not None:
+    #         test_src = get_data(test_src)
+    #         if type(test_label) == str:
+    #             if test_label in test_src.columns:
+    #                 test_label = test_src.pop(test_label)
+    #             else:
+    #                 raise ValueError('%s not in test data!' % test_label)
 
-        self.st = self._reset_st(self.st, df.shape[1])
-        self.columns = list(df.columns)
+    #     self.st = self._reset_st(self.st, df.shape[1])
+    #     self.columns = list(df.columns)
 
-        tmp = df
-        test_tmp = test_src
-        for encoder_dict in self.st:
-            enc = instantiate.instantiate(encoder_dict['method'], encoder_dict['params'])
-            tmp = enc.fit_transform(tmp, label, test_tmp, test_label)
-            test_tmp = enc.transform(test_tmp)
-            encoder_dict['enc'] = enc
+    #     tmp = df
+    #     test_tmp = test_src
+    #     for encoder_dict in self.st:
+    #         enc = instantiate.instantiate(encoder_dict['method'], encoder_dict['params'])
+    #         tmp = enc.fit_transform(tmp, label, test_tmp, test_label)
+    #         test_tmp = enc.transform(test_tmp)
+    #         encoder_dict['enc'] = enc
 
-            if tmp.shape[1] == 0:
-                break
+    #         if tmp.shape[1] == 0:
+    #             break
 
-        df_final = pd.concat([tmp, label], axis=1)
-        return df_final
+    #     df_final = pd.concat([tmp, label], axis=1)
+    #     return df_final
 
     def transform(self, df_src):
         df = get_data(df_src)

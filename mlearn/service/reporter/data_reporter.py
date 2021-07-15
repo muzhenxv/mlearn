@@ -169,7 +169,9 @@ def _gen_eva_report(df_train_origin, df_test_origin, label, report_dst, decimals
 
 
 def _gen_woe_eva_report(df_train_origin, df_test_origin, label, report_dst, decimals=4, gen_report=True, **kwargs):
+    print('    start _gen_woe_report...')
     df1 = _gen_woe_report(df_train_origin, df_test_origin, label, report_dst, **kwargs)
+    print('    start _gen_eva_report...')
     df2 = _gen_eva_report(df_train_origin, df_test_origin, label, report_dst)
     df2.columns = df2.columns.droplevel(1)
     del df2['IV']
@@ -335,9 +337,12 @@ def _gen_stable_report(df_train_origin, df_test_origin, label, report_dst, decim
 
 def _gen_eda_report(df_train_origin, df_test_origin, label, report_dst, decimals=4, gen_report=True,
                     covariate_shift_eva=True, **kwargs):
+    print('start _gen_woe_eva_report...')
     tmp = _gen_woe_eva_report(df_train_origin, df_test_origin, label, report_dst, decimals=decimals,
                               gen_report=gen_report, **kwargs)
+    print('start _gen_desc_report...')
     tmp = _gen_desc_report(df_train_origin, df_test_origin, label, report_dst, decimals=decimals, gen_report=gen_report)
+    print('start _gen_stable_report...')
     tmp = _gen_stable_report(df_train_origin, df_test_origin, label, report_dst, decimals=decimals,
                              gen_report=gen_report,
                              covariate_shift_eva=covariate_shift_eva)
@@ -425,9 +430,11 @@ def transformer_report(df_train_origin, df_test_origin, label, report_dst, gen_r
     df_train = df_train_origin.copy()
     df_test = df_test_origin.copy()
 
+    print('start gen eda report...')
     _gen_eda_report(df_train_origin, df_test_origin, label, report_dst, gen_report=gen_report,
                     covariate_shift_eva=covariate_shift_eva)
 
+    print('start preparing feature_plot...')
     # feature_plot
     df_train.fillna(-999, inplace=True)
     train_plot_data = feature_plot(df_train, label, path=os.path.join(report_dst, 'train_feature_plot.png'))

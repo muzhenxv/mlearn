@@ -32,7 +32,7 @@ class Psi(BaseEstimator, TransformerMixin):
             Decimal(str(s.sum())).quantize(Decimal(str(self.smooth))))) / len(actual_score)
 
         self.dist = self.expect_dist.copy()
-        self.dist['actual_score'] = self.dist.cat.map(s)
+        self.dist['actual_score'] = self.dist.cat.map(s).astype(float)
 
         self.dist['expect_score_ratio'] = self.dist.expect_score / self.dist.expect_score.sum()
         self.dist['actual_score_ratio'] = self.dist.actual_score / self.dist.actual_score.sum()

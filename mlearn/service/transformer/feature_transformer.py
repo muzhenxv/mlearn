@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
 from pandas.api.types import is_numeric_dtype
-from .continous_encoding import *
-from .category_encoding import *
-from .custom_encoding import *
-from .base_encoding import *
+# from .continous_encoding import *
+# from .category_encoding import *
+# from .custom_encoding import *
+# from .base_encoding import *
+from .feature_encoding import *
 from ..data_service import get_data
 import json
 import pickle
@@ -53,8 +54,7 @@ class FeatureTransformer(BaseEstimator, TransformerMixin):
             encoders = dic['encoders']
             tmp = df[cols]
             for i, encoder in enumerate(encoders):
-                print('start----', tmp.columns)
-                print(encoder['method'])
+                print('start fit----', tmp.columns, encoder['method'])
                 enc = iu.instantiate(encoder['method'], encoder['params'])
                 tmp = enc.fit_transform(tmp, df_label)
                 dill.dump(enc, open(os.path.join(self.dst, '%s_%s_%s.pkl' % (encoder['method'], j, i)), 'wb'))
@@ -109,9 +109,7 @@ class FeatureTransformer(BaseEstimator, TransformerMixin):
             encoders = dic['encoders']
             tmp = df[cols]
             for i, encoder in enumerate(encoders):
-                print('start----', tmp.columns)
-                print(encoder['method'])
-                # enc = eval(encoder['method'])(**encoder['params'])
+                print('start fit_transform----', i, encoder['method'], tmp.columns)
                 enc = iu.instantiate(encoder['method'], encoder['params'])
                 tmp = enc.fit_transform(tmp, df_label)
 
@@ -162,8 +160,7 @@ class FeatureTransformer(BaseEstimator, TransformerMixin):
             tmp = df[cols]
             for i, encoder in enumerate(encoders):
                 if self.verbose:
-                    print('start----', tmp.columns)
-                    print(encoder['method'])
+                    print('start transform ----', tmp.columns, encoder['method'])
                 if not 'enc' in encoder:
                     break
 

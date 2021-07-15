@@ -65,7 +65,7 @@ def data_spliter(df_src, label, report_dst, time_col='biz_report_expect_at', ind
     if label != label_col:
         del train[label_col], test[label_col]
 
-    spliter_report(train, test, time_col, label, report_dst)
+    # spliter_report(train, test, time_col, label, report_dst, covariate_shift_eva=False)
     del train[time_col], test[time_col]
 
 

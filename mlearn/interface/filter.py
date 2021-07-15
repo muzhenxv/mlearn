@@ -1,3 +1,4 @@
+from numpy.lib.function_base import cov
 from ..service import FeatureFilter
 import json
 import pickle
@@ -26,7 +27,9 @@ def filter_ui(json_str):
 
         enc = FeatureFilter(dic['st'])
 
-        df_train = enc.fit_transform(train_src, label, test_src, label)
+        # df_train = enc.fit_transform(train_src, label, test_src, label)
+        enc.fit(train_src, label, test_src, label)
+        df_train = enc.transform(train_src)
 
         dill.dump(enc, open(train_process_dst, 'wb'))
         df_train.to_pickle(train_data_dst)
@@ -37,7 +40,7 @@ def filter_ui(json_str):
         else:
             test_data_dst = None
 
-        filter_report(enc, df_train, df_test, label, report_dst)
+        filter_report(enc, df_train, df_test, label, report_dst,covariate_shift_eva=False)
 
 
         code = 1

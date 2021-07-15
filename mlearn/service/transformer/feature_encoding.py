@@ -3,6 +3,7 @@ import pandas as pd
 import bisect
 import math
 from collections import defaultdict, Counter
+from pandas.api.types import is_numeric_dtype
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, Imputer
@@ -34,6 +35,81 @@ def infer_dtypes(df, threshold=5, dtype='cate'):
         raise ValueError('param dtype must be assigned as cate or cont!')
     return cols
 
+def _get_max_same_count(c):
+    try:
+        return c.value_counts().iloc[0]
+    except:
+        return len(c)
+
+
+def _get_same_value_ratio(df):
+    t = df.apply(_get_max_same_count) / df.shape[0]
+    t.name = 'same_value'
+    return t
+
+
+def _get_missing_value_ratio(df):
+    t = df.isnull().mean()
+    t.name = 'missing'
+    return t
+
+class BaseEncoder(BaseEstimator, TransformerMixin):
+    """
+    用于剔除缺失值严重列，同值严重列，不同值严重cate列（字符串列如果取值太过于分散，则信息量过低）。
+
+    适用于cont和cate，支持缺失值, 建议放置在encoder序列第一位次
+
+    Parameters
+    ----------
+    missing_thr: 0.8, 缺失率高于该值的列会被剔除
+
+    same_thr: 0.8, 同值率高于该值的列会被剔除
+
+    caate_thr: 0.9， 取值分散率高于该值的字符串列会被剔除
+
+    Attributes
+    ----------
+    missing_cols: list, 被剔除的缺失值列
+
+    same_cols: list, 被剔除的同值列
+
+    cate_cols: list, 被剔除的取值分散字符串列
+
+    exclude_cols: list, 被剔除的列名
+    """
+
+    def __init__(self, missing_thr=0.8, same_thr=0.8, cate_thr=0.9):
+        self.missing_thr = missing_thr
+        self.same_thr = same_thr
+        self.cate_thr = cate_thr
+
+    def fit(self, X, y=None):
+        df = pd.DataFrame(X.copy())
+        tmp = df.dtypes.map(is_numeric_dtype)
+        categorial_features = tmp[~tmp].index.values
+
+        # 寻找缺失值严重列
+        tmp = _get_missing_value_ratio(df)
+        self.missing_cols = list(tmp[tmp > self.missing_thr].index.values)
+
+        # 寻找同值严重列
+        tmp = _get_same_value_ratio(df)
+        self.same_cols = list(tmp[tmp > self.same_thr].index.values)
+
+        # 寻找不同值严重cate列
+        if len(categorial_features) > 0:
+            tmp = df[categorial_features]
+            tmp = tmp.nunique() / df.shape[0]
+            self.cate_cols = list(tmp[tmp > self.cate_thr].index.values)
+        else:
+            self.cate_cols = list([])
+
+        self.exclude_cols = list(set(self.missing_cols + self.same_cols + self.cate_cols))
+        return self
+
+    def transform(self, X):
+        df = pd.DataFrame(X.copy())
+        return df.drop(self.exclude_cols, axis=1)
 # deprecated
     # def qcut_duplicates(X, bins=10, precision=8, retbins=True, duplicates='drop', **kwargs):
     #     """
@@ -80,6 +156,7 @@ def dt_cut_points(x, y, bins=None, max_depth=None, min_samples_leaf=1, max_leaf_
     """
     if bins is not None:
         max_leaf_nodes = bins
+        max_depth = np.ceil(np.sqrt(bins))
     dt = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf, max_leaf_nodes=max_leaf_nodes,
                                 random_state=random_state)
     dt.fit(np.array(x).reshape(-1, 1), np.array(y))
@@ -280,7 +357,7 @@ class ContBinningEncoder(BaseEstimator, TransformerMixin):
         assert list(df.columns) == self.columns
 
         for c in self.specified_columns:
-            df[str(c) + self.suffix] = pd.cut(pd.to_numeric(df[c]), bins=self.map[c]['cut_points'], labels=self.map[c]['labels'], precision=8).astype(float).fillna(0).astype(int).astype('category')
+            df[str(c) + self.suffix] = pd.cut(pd.to_numeric(df[c]), bins=self.map[c]['cut_points'], labels=self.map[c]['labels'], precision=8).astype(float).fillna(0).astype(int)
             if self.inplace & (self.suffix != ''):
                 del df[c]
         return df
@@ -396,7 +473,7 @@ class CateBinningEncoder(BaseEstimator, TransformerMixin):
 
     """
 
-    def __init__(self, cate_threshold=200, specified_features='infer', bins=100, binning_method='dt', inplace=True, suffix='_woebin', **kwargs):
+    def __init__(self, cate_threshold=200, specified_features='infer', bins=10, binning_method='dt', inplace=True, suffix='_woebin', **kwargs):
         self.cate_threshold = cate_threshold
         self.bins = bins
         self.binning_method = binning_method
@@ -461,7 +538,12 @@ class CateBinningEncoder(BaseEstimator, TransformerMixin):
         t1 = self.encoder.transform(df[self.specified_woebin_columns])
         for c in self.specified_unique_columns:
             # TODO: 缺失和未见词应该统一为0么？还是进行区分？
-            df[str(c) + self.suffix] = df[c].map({v: k for k, v in self.kmap[c].items()}).fillna(0).astype('category')
+            df[str(c) + self.suffix] = df[c].map({v: k for k, v in self.kmap[c].items()})
+            # try:
+            #     df[str(c) + self.suffix] = df[str(c) + self.suffix].cat.add_categories([0])
+            # except:
+            #     pass
+            df[str(c) + self.suffix] = df[str(c) + self.suffix].fillna(0)
             if self.inplace & (self.suffix != ''):
                 del df[c]
         if self.inplace:
@@ -662,7 +744,7 @@ class BinningEncoder(BaseEstimator, TransformerMixin):
 
         logger('start cont_columns binning')
         if len(self.cont_columns) > 0:
-            self.cont_bin_enc = ContBinningEncoder(cate_threshold=self.cate_threshold, bins=self.cont_bins,
+            self.cont_bin_enc = ContBinningEncoder(cate_threshold=self.cate_threshold, bins=self.cont_bins, specified_features='all',
                                                    binning_method=self.binning_method, inplace=self.inplace,
                                                    suffix=self.suffix)
             self.cont_bin_enc.fit(df[self.cont_columns], y)
@@ -670,7 +752,7 @@ class BinningEncoder(BaseEstimator, TransformerMixin):
 
         logger('start cate_columns binning')
         if len(self.cate_columns) > 0:
-            self.cate_bin_enc = CateBinningEncoder(bins=self.cate_bins, cate_threshold=self.cate_threshold, inplace=self.inplace, suffix=self.suffix)
+            self.cate_bin_enc = CateBinningEncoder(bins=self.cate_bins, specified_features='all', inplace=self.inplace, suffix=self.suffix)
             self.cate_bin_enc.fit(df[self.cate_columns], y)
             self.kmap.update(self.cate_bin_enc.kmap)
 
@@ -688,7 +770,7 @@ class BinningEncoder(BaseEstimator, TransformerMixin):
         return df_result
 
 class BinningWOEEncoder(BaseEstimator, TransformerMixin):
-    def __init__(self, cate_threshold=200, cate_bins=100, cont_bins=10, binning_method='dt', inplace=True, woe_min=-4.6, woe_max=4.6, \
+    def __init__(self, cate_threshold=20, cate_bins=20, cont_bins=10, binning_method='dt', inplace=True, woe_min=-4.6, woe_max=4.6, \
                  suffix='_binwoe', **kwargs):
         self.cate_threshold = cate_threshold
         self.cate_bins = cate_bins

@@ -25,7 +25,8 @@ def transformer_ui(json_str):
         train_data_dst, train_process_dst, test_data_dst, report_dst = create_dirpath(dst, 'transformer')
 
         enc = FeatureTransformer(dic_p, dst)
-        df_train = enc.fit_transform(train_src, label)
+        enc.fit(train_src, label)
+        df_train = enc.transform(train_src)
 
         try:
             df_train.to_pickle(train_data_dst)
@@ -34,6 +35,7 @@ def transformer_ui(json_str):
         dill.dump(enc, open(train_process_dst, 'wb'))
 
         if test_src is not None:
+            print('start teset_src transform...')
             df_test = enc.transform(test_src)
             try:
                 df_test.to_pickle(test_data_dst)
@@ -44,7 +46,8 @@ def transformer_ui(json_str):
             df_test = None
 
         try:
-            transformer_report(df_train, df_test, label, report_dst)
+            print('start transformer report...')
+            transformer_report(df_train, df_test, label, report_dst, covariate_shift_eva=False)
         except Exception as e:
             print(traceback.format_exc())
             pass

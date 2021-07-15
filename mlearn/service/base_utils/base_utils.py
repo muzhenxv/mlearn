@@ -241,6 +241,8 @@ class MyEncoder(json.JSONEncoder):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
+        elif isinstance(obj, pd._libs.interval.Interval):
+            return str(obj)                
         else:
             return super(MyEncoder, self).default(obj)
 
@@ -253,5 +255,7 @@ class simplejsonEncoder(simplejson.JSONEncoder):
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
+        elif isinstance(obj, pd._libs.interval.Interval):
+            return str(obj)                
         else:
             return super(MyEncoder, self).default(obj)

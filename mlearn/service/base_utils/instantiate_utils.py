@@ -6,10 +6,11 @@ import sys
 import simplejson
 import traceback
 
-from ..transformer.continous_encoding import *
-from ..transformer.category_encoding import *
-from ..transformer.base_encoding import *
-from ..transformer.feature_gen import *
+# from ..transformer.continous_encoding import *
+# from ..transformer.category_encoding import *
+# from ..transformer.base_encoding import *
+# from ..transformer.feature_gen import *
+from ..transformer.feature_encoding import *
 from ..filter.base_filter import *
 
 from sklearn.feature_selection import *
