@@ -4,7 +4,9 @@ from ..data_service import get_data
 from ..reporter import spliter_report
 import pandas as pd
 
-def data_spliter(df_src, label, report_dst, time_col='biz_report_expect_at', index_col='apply_risk_id', label_col='overdue_days', test_size=0.2, method='oot', random_state=7, group_key=None, drop_cols=None):
+def data_spliter(df_src, label, report_dst, time_col='biz_report_expect_at', index_col='apply_risk_id', 
+                label_col='overdue_days', test_size=0.2, method='oot', random_state=7, gen_report=True,
+                group_key=None, drop_cols=None):
     """
     数据分割功能，支持oot分割，随机分割，分组oot分割（每一组按照oot标准分割）
     :param df_src:
@@ -65,7 +67,8 @@ def data_spliter(df_src, label, report_dst, time_col='biz_report_expect_at', ind
     if label != label_col:
         del train[label_col], test[label_col]
 
-    # spliter_report(train, test, time_col, label, report_dst, covariate_shift_eva=False)
+    if gen_report:
+        spliter_report(train, test, time_col, label, report_dst, covariate_shift_eva=False)
     del train[time_col], test[time_col]
 
 

@@ -40,7 +40,7 @@ def filter_ui(json_str):
         else:
             test_data_dst = None
 
-        filter_report(enc, df_train, df_test, label, report_dst,covariate_shift_eva=False)
+        filter_report(enc, df_train, df_test, label, report_dst,covariate_shift_eva=True)
 
 
         code = 1

@@ -68,9 +68,9 @@ def detect_covariate_shift(train, test, report_dst=None):
         "scale_pos_weight": 1,
         "eval_metric": "auc",
         "max_depth": 3,
-        "n_jobs": 1,
+        "n_jobs": 32,
         "early_stopping_rounds": 30,
-        "n_estimators": 1000,
+        "n_estimators": 100,
         "random_state": 0,
         "reg_alpha": 1,
         "booster": "gbtree",
@@ -78,8 +78,8 @@ def detect_covariate_shift(train, test, report_dst=None):
         "verbose": False,
         "colsample_bylevel": 0.8,
         "subsample": 0.7,
-        "learning_rate": 0.1,
-        "gamma": 0.5,
+        "learning_rate": 0.05,
+        "gamma": 2,
         "max_delta_step": 0,
         "min_child_weight": 10
     }

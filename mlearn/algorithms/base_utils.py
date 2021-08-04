@@ -12,7 +12,7 @@ class RulerMixin:
 
     def _single_rule_vote(self, X, rule):
 #         df = check_array(X)
-        df = pd.DataFrame(X, columns=self.feature_names_)
+        df = pd.DataFrame(X, columns=self._feature_names)
 
         scores = np.zeros(X.shape[0], dtype=int)
         scores[list(df.query(rule, engine='python').index)] += 1
@@ -50,16 +50,24 @@ class RulerMixin:
             lift = np.nan
         return lift
 
+    @staticmethod
+    def strReplace(s, dic):
+        for k, v in dic.items():
+            s = s.replace(k, v)
+        return s
+
     def get_metrics(self, X, y, average='binary'):
-        if (type(X) == pd.DataFrame) & (list(X.columns) != self.feature_names_):
+        if (type(X) == pd.DataFrame) & (list(X.columns) != self._feature_names):
             raise ('columns inconsistence!')
 
 #         df = check_array(X)
-        df = pd.DataFrame(X, columns=self.feature_names_)
+        df = pd.DataFrame(X, columns=self._feature_names)
 
         result = []
 
         selected_rules = self.rules_
+        dic = dict(zip(self.feature_names_[::-1], self._feature_names[::-1]))
+        selected_rules = [(self.strReplace(c[0], dic), c[1]) for c in self.rules_]          
         for (r, _) in selected_rules:
             scores = np.zeros(X.shape[0], dtype=int)
             scores[np.array(range(X.shape[0]))[X.eval(r, engine='python')]] += 1

@@ -10,7 +10,7 @@ class SkopeRuler(SkopeRules, RulerMixin):
             self.random_state = 7
 
     def fit(self, X, y, sample_weight=None):
-        self.feature_names = list(X.columns)
+        self._feature_names = list(X.columns)
         super().fit(X, y, sample_weight=sample_weight)
         return self
 

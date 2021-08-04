@@ -4,7 +4,6 @@ import random
 from sklearn.base import BaseEstimator, TransformerMixin
 from decimal import Decimal
 
-
 class Psi(BaseEstimator, TransformerMixin):
     def __init__(self, q=10, max_th=10, min_th=-10, smooth=0.0001, range_ratio=0.2, precision=8):
         self.max_th = max_th
@@ -17,7 +16,7 @@ class Psi(BaseEstimator, TransformerMixin):
     def fit(self, expect_score):
         expect_score = pd.Series(expect_score)
 
-        self.bins = self.qcut(expect_score, q=self.q, range_ratio=self.range_ratio, precision=self.precision)
+        self.bins = self.qcut_duplicates(expect_score, q=self.q, range_ratio=self.range_ratio, precision=self.precision)
         self.expect_dist = pd.DataFrame(
             pd.cut(expect_score, bins=self.bins, include_lowest=True).value_counts()).reset_index()
         self.expect_dist.columns = ['cat', 'expect_score']
@@ -52,6 +51,22 @@ class Psi(BaseEstimator, TransformerMixin):
         cut_points[0] -= span * range_ratio
         cut_points[-1] += span * range_ratio
 
+        return cut_points
+    
+    @staticmethod
+    def qcut_duplicates(X, bins=10, range_ratio=0.1, precision=8, duplicates='drop', **kwargs):
+        """
+        用于消除此种情况：即使取值数很多，在某几列的占比非常高的情况下，即使要求分箱数为10，最终分箱结果可能依旧只有少数几类。
+        """
+        X_copy = pd.Series(X)
+        t = X_copy.value_counts(normalize=True)
+        points1 = t[t>=0.5/bins].index.tolist()
+        X_copy = X_copy[~X_copy.isin(points1)]
+        _, points2 = pd.qcut(X_copy, q=bins-len(points1), retbins=True, duplicates=duplicates, precision=precision)
+        cut_points = sorted(points1 + list(points2))
+        span = cut_points[-1] - cut_points[0]
+        cut_points[0] -= span * range_ratio
+        cut_points[-1] += span * range_ratio
         return cut_points
 
 

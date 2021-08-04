@@ -13,7 +13,18 @@ from sklearn.tree import DecisionTreeClassifier
 import datetime
 def logger(msg):
     print('[INFO]', datetime.datetime.now(), ':', msg)
-                    
+
+class ImputeEncoder(BaseEstimator, TransformerMixin):
+    def __init__(self, fillna_value=-999):
+        self.fillna_value = fillna_value
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        df = pd.DataFrame(X.copy())
+        return df.replace(['nan', np.nan], self.fillna_value)
+           
 def infer_dtypes(df, threshold=5, dtype='cate'):
     """
     dataframe 判断特征类型。首先根据类型判断，然后对数值型做附加判断
@@ -134,7 +145,7 @@ def qcut_duplicates(X, bins=10, precision=8, retbins=True, duplicates='drop', **
     t = X_copy.value_counts(normalize=True)
     points1 = t[t>=0.5/bins].index.tolist()
     X_copy = X_copy[~X_copy.isin(points1)]
-    _, points2 = pd.qcut(X_copy, q=bins-len(points1), retbins=True, duplicates=duplicates, precision=precision)
+    _, points2 = pd.qcut(X_copy, q=max(bins-len(points1), 2), retbins=True, duplicates=duplicates, precision=precision)
     print(points2)
     l = sorted(points1 + list(points2))
     l[0] = -np.inf
@@ -370,7 +381,7 @@ class WOEEncoder(BaseEstimator, TransformerMixin):
 
     Parameters
     ----------
-    diff_thr : int, default: 20
+    cate_threshold : int, default: 20
         不同取值数小于等于该值的才进行woe变换，不然原样返回
 
     woe_min : int, default: -np.log(100)

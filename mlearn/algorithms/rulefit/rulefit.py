@@ -674,6 +674,7 @@ class RuleFitClassifier(RuleFit, RulerMixin):
         else:
             X_copy = X.copy()
         self.feature_names_ = feature_names
+        self._feature_names = feature_names
         super().fit(X_copy, y, feature_names=self.feature_names_, sample_weight=sample_weight)
         self.rules_ = [(i, (np.nan, np.nan, np.nan)) for i in
                        super().get_rules()[super().get_rules()['type'] == 'rule'].rule]

@@ -349,6 +349,7 @@ class RipperkClassifier(Ripperk, RulerMixin):
         else:
             df_copy = df.copy()
         self.feature_names_ = list(df_copy.columns)
+        self._feature_names = list(df_copy.columns)
 
         super().fit(df_copy, label)
         self.rules_ = []

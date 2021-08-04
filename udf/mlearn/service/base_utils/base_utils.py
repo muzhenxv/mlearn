@@ -154,7 +154,7 @@ def _describe_excel_format(writer, df, sheetname, axis=0, format_index=-1, contr
             start_i += 1
         start_j0 = len(df_copy.index.names)
         start_j = len(df_copy.index.names) + df_copy.shape[1]
-        index_list = _format_color_index(list(df_copy.index.labels[format_index]), control_color_num)
+        index_list = _format_color_index(list(df_copy.index.codes[format_index]), control_color_num)
 
         for row in range(df_copy.shape[0]):
             worksheet.set_row(row + start_i, cell_format=dic_format[index_list[row]])
@@ -171,7 +171,7 @@ def _describe_excel_format(writer, df, sheetname, axis=0, format_index=-1, contr
 
     elif axis == 1:
         start_i = len(df_copy.index.names)
-        index_list = _format_color_index(list(df_copy.columns.labels[format_index]), control_color_num)
+        index_list = _format_color_index(list(df_copy.columns.codes[format_index]), control_color_num)
 
         for row in range(df_copy.shape[1]):
             worksheet.set_column(row + start_i, row + start_i, cell_format=dic_format[index_list[row]])

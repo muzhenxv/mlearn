@@ -124,7 +124,7 @@ def _gen_woe_report(df_train_origin, df_test_origin, label_col, report_dst, deci
     df['overdue_sample_num'] = df['overdue_sample_num'].fillna(0).astype(float)
     df['overdue_ratio'] = df['overdue_ratio'].fillna(0).astype(float)
 
-    t = df.iloc[:, [i for i, v in enumerate(list(df.columns.labels[0])) if v == list(df.columns.levels[0]).index('IV')]]
+    t = df.iloc[:, [i for i, v in enumerate(list(df.columns.codes[0])) if v == list(df.columns.levels[0]).index('IV')]]
     del df['IV']
     df = t.join(df, how='outer')
     df.insert(0, 'L-PSI', value=np.nan)
@@ -335,7 +335,7 @@ def _gen_stable_report(df_train_origin, df_test_origin, label, report_dst, decim
     return df
 
 
-def _gen_eda_report(df_train_origin, df_test_origin, label, report_dst, decimals=4, gen_report=True,
+def _gen_eda_report(df_train_origin, df_test_origin, label, report_dst, decimals=8, gen_report=True,
                     covariate_shift_eva=True, **kwargs):
     print('start _gen_woe_eva_report...')
     tmp = _gen_woe_eva_report(df_train_origin, df_test_origin, label, report_dst, decimals=decimals,

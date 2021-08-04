@@ -1,3 +1,4 @@
+pandas==1.0.5
 seaborn==0.8.1
 cmake==3.14.4
 hdfs==2.5.8
@@ -22,3 +23,5 @@ keras==2.2.4
 skope-rules==1.0.0
 presto-python-client==0.5.1
 joblib==0.13.2
+xlsxwriter==1.4.4
+sklearn==0.20.0
