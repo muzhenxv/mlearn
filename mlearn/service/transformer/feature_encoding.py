@@ -359,7 +359,7 @@ class ContBinningEncoder(BaseEstimator, TransformerMixin):
                                                        **self.kwargs)
             self.map[c]['labels'] = np.arange(1, len(self.map[c]['cut_points']))
             for i in range(len(self.map[c]['cut_points']) - 1):
-                self.kmap[c][i] = '(%s, %s]' % (self.map[c]['cut_points'][i], self.map[c]['cut_points'][i + 1])
+                self.kmap[c][i+1] = '(%s, %s]' % (self.map[c]['cut_points'][i], self.map[c]['cut_points'][i + 1])
         self.kmap = dict(self.kmap)
         return self
 

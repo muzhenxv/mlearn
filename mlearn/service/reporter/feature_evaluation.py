@@ -241,7 +241,7 @@ class WOEReport(BaseEstimator, TransformerMixin):
         y_data = copy.copy(y)
         if type(y_data) == str:
             y_data = df.pop(y_data)
-        self.enc = BinningEncoder(suffix='', cate_threshold=20, cate_bins=20, cont_bins=20, **kwargs)
+        self.enc = BinningEncoder(suffix='', cate_threshold=10, cate_bins=10, cont_bins=10, **kwargs)
         tmp = self.enc.fit_transform(df, y_data)
 
         for c in tmp.columns:

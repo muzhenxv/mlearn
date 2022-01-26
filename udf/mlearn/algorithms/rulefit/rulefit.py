@@ -423,11 +423,11 @@ class RuleFit(BaseEstimator, TransformerMixin):
 
     def __init__(self, tree_size=4, sample_fract='default', max_rules=2000,
                  memory_par=0.01,
-                 tree_generator=None,
+                 tree_generator='XGBRegressor',
                  rfmode='regress', lin_trim_quantile=0.025,
                  lin_standardise=True, exp_rand_tree_size=True,
                  model_type='rl', Cs=None, cv=3, random_state=7):
-        self.tree_generator = tree_generator
+        self.tree_generator = eval(tree_generator+'()')
         self.rfmode = rfmode
         self.lin_trim_quantile = lin_trim_quantile
         self.lin_standardise = lin_standardise
@@ -670,10 +670,11 @@ class RuleFitClassifier(RuleFit, RulerMixin):
     def fit(self, X, y, feature_names=None, sample_weight=None):
         if (feature_names is None) & (type(X) is pd.DataFrame):
             feature_names = list(X.columns)
-            X_copy = X.as_matrix()
+            X_copy = X.values
         else:
             X_copy = X.copy()
         self.feature_names_ = feature_names
+        self._feature_names = feature_names
         super().fit(X_copy, y, feature_names=self.feature_names_, sample_weight=sample_weight)
         self.rules_ = [(i, (np.nan, np.nan, np.nan)) for i in
                        super().get_rules()[super().get_rules()['type'] == 'rule'].rule]
